@@ -1,0 +1,127 @@
+<!-- pages/calendar/calendar.wxml -->
+<view class="page">
+  <!-- Tab -->
+  <view class="tabs">
+    <view class="tab {{activeTab=='calendar'?'active':''}}" bindtap="switchTab" data-tab="calendar">日历</view>
+    <view class="tab {{activeTab=='members'?'active':''}}"  bindtap="switchTab" data-tab="members">成员</view>
+  </view>
+
+  <!-- ═══════════ 周视图 ═══════════ -->
+  <block wx:if="{{activeTab=='calendar'}}">
+
+    <!-- 周导航栏 -->
+    <view class="week-nav">
+      <view class="nav-arrow" bindtap="prevWeek">‹</view>
+      <view class="week-title-area">
+        <text class="week-title">{{weekDays[0].dateStr}} ~ {{weekDays[6].dateStr}}</text>
+        <view class="today-btn" bindtap="goToday">今天</view>
+      </view>
+      <view class="nav-arrow" bindtap="nextWeek">›</view>
+    </view>
+
+    <!-- 列头：7天 -->
+    <view class="grid-header">
+      <view class="time-gutter-head"></view>
+      <view class="day-head {{item.isToday?'today':''}}"
+        wx:for="{{weekDays}}" wx:key="dateStr">
+        <text class="day-week">{{item.label}}</text>
+        <text class="day-num {{item.isToday?'today-num':''}}">{{item.dayNum}}</text>
+      </view>
+    </view>
+
+    <!-- 滚动区：时间轴 + 事件格 -->
+    <scroll-view class="grid-scroll" scroll-y scroll-with-animation>
+      <view class="grid-body">
+
+        <!-- 左侧时间刻度 -->
+        <view class="time-gutter">
+          <view class="hour-cell" wx:for="{{hourLabels}}" wx:key="*this">
+            <text class="hour-label">{{item}}</text>
+          </view>
+        </view>
+
+        <!-- 主体：7列背景线 + 事件块绝对定位 -->
+        <view class="grid-main">
+          <!-- 背景：24行横线 -->
+          <view class="bg-lines">
+            <view class="hour-line" wx:for="{{hourLabels}}" wx:key="*this"></view>
+          </view>
+
+          <!-- 7列竖分割线 -->
+          <view class="col-lines">
+            <view class="col-line" wx:for="{{weekDays}}" wx:key="dateStr"></view>
+          </view>
+
+          <!-- 事件块（绝对定位） -->
+          <view
+            wx:for="{{eventBlocks}}" wx:key="id"
+            class="event-block {{item.status=='pending'?'ev-pending':''}} {{item.event_type=='assigned'?'ev-assigned':''}}"
+            style="{{item.style}}"
+            bindtap="openEvent"
+            data-id="{{item.id}}"
+          >
+            <text class="ev-title">{{item.title}}</text>
+            <text class="ev-time">{{item.startLabel}}-{{item.endLabel}}</text>
+          </view>
+        </view>
+
+      </view>
+    </scroll-view>
+
+    <!-- 图例 -->
+    <view class="legend">
+      <view class="legend-item" wx:if="{{calendar}}">
+        <view class="legend-dot" style="background:#4A90D9"></view>
+        <text>创建者</text>
+      </view>
+      <view class="legend-item" wx:for="{{members}}" wx:key="id">
+        <view class="legend-dot" style="background:{{colorMap[item.id]}}"></view>
+        <text>{{item.nick_name}}</text>
+      </view>
+    </view>
+
+    <!-- 操作按钮 -->
+    <view class="action-bar">
+      <view class="action-btn primary"  bindtap="goCreateEvent">+ 创建事件</view>
+      <view wx:if="{{isCreator}}" class="action-btn assigned" bindtap="goCreateAssigned">+ 指派事件</view>
+      <view wx:if="{{isCreator}}" class="action-btn share"    bindtap="shareInvite">分享邀请</view>
+    </view>
+
+  </block>
+
+  <!-- ═══════════ 成员视图 ═══════════ -->
+  <block wx:if="{{activeTab=='members'}}">
+    <view class="member-list">
+      <view class="member-section-title">创建者</view>
+      <view class="member-item creator-item">
+        <view class="color-bar" style="background:#4A90D9"></view>
+        <image class="member-avatar" src="{{calendar.creator_avatar||''}}" mode="aspectFill"/>
+        <view class="member-info">
+          <text class="member-name">{{calendar.creator_name||'创建者'}}</text>
+          <text class="member-role">日历创建者</text>
+        </view>
+        <text class="crown">👑</text>
+      </view>
+
+      <view class="member-section-title">成员（{{members.length}}人）</view>
+      <view wx:if="{{members.length===0}}" class="empty">暂无成员</view>
+      <view wx:else>
+        <view class="member-item" wx:for="{{members}}" wx:key="id">
+          <view class="color-bar" style="background:{{colorMap[item.id]||'#999'}}"></view>
+          <image class="member-avatar" src="{{item.avatar_url||''}}" mode="aspectFill"/>
+          <view class="member-info">
+            <text class="member-name">{{item.nick_name}}</text>
+            <text class="member-role">加入于 {{item.joined_at.substring(0,10)}}</text>
+          </view>
+          <view wx:if="{{isCreator}}" class="remove-btn"
+            bindtap="removeMember" data-id="{{item.id}}" data-name="{{item.nick_name}}">移除</view>
+        </view>
+      </view>
+
+      <view wx:if="{{isCreator}}" class="danger-zone">
+        <view class="btn-danger-outline" bindtap="deleteCalendar">删除此日历</view>
+      </view>
+    </view>
+  </block>
+
+</view>

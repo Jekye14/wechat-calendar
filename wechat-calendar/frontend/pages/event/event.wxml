@@ -1,0 +1,53 @@
+<!-- pages/event/event.wxml -->
+<view class="page">
+  <view class="form-card">
+    <view class="field">
+      <text class="label required">主题</text>
+      <input class="input" placeholder="请输入事件主题" value="{{title}}" bindinput="onTitleInput"/>
+    </view>
+    <view class="divider"></view>
+
+    <view class="field">
+      <text class="label required">开始时间</text>
+      <view class="datetime-row">
+        <picker mode="date" value="{{startDate}}" bindchange="onStartDateChange">
+          <view class="picker-box">{{startDate || '选择日期'}}</view>
+        </picker>
+        <picker mode="time" value="{{startTime}}" bindchange="onStartTimeChange">
+          <view class="picker-box">{{startTime}}</view>
+        </picker>
+      </view>
+    </view>
+    <view class="divider"></view>
+
+    <view class="field">
+      <text class="label required">结束时间</text>
+      <view class="datetime-row">
+        <picker mode="date" value="{{endDate}}" bindchange="onEndDateChange">
+          <view class="picker-box">{{endDate || '选择日期'}}</view>
+        </picker>
+        <picker mode="time" value="{{endTime}}" bindchange="onEndTimeChange">
+          <view class="picker-box">{{endTime}}</view>
+        </picker>
+      </view>
+    </view>
+    <view class="divider"></view>
+
+    <view class="field">
+      <text class="label">地点</text>
+      <input class="input" placeholder="选填" value="{{location}}" bindinput="onLocationInput"/>
+    </view>
+    <view class="divider"></view>
+
+    <view class="field">
+      <text class="label">内容</text>
+      <textarea class="textarea" placeholder="选填，填写事件详细内容" value="{{content}}" bindinput="onContentInput"/>
+    </view>
+  </view>
+
+  <view class="tip">注：成员创建的事件需创建者（导师）审批后生效，且不能与创建者事件时间冲突。</view>
+
+  <view class="submit-btn {{submitting?'disabled':''}}" bindtap="submit">
+    {{submitting ? '提交中...' : (isEdit ? '保存修改' : '提交事件')}}
+  </view>
+</view>

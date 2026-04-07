@@ -1,0 +1,54 @@
+<!-- pages/index/index.wxml -->
+<view class="page">
+  <view class="header">
+    <view class="header-left">
+      <image class="avatar" src="{{userInfo.avatar_url || ''}}" mode="aspectFill"/>
+      <text class="welcome">{{userInfo ? userInfo.nick_name : '请登录'}}</text>
+    </view>
+    <view class="header-btn" bindtap="showCreate">+ 新建日历</view>
+  </view>
+
+  <view class="section-title">我的日历</view>
+
+  <view wx:if="{{loading}}" class="empty">加载中...</view>
+  <view wx:elif="{{calendars.length === 0}}" class="empty">暂无日历，点击右上角新建或扫码加入</view>
+
+  <view wx:else class="cal-list">
+    <view class="cal-card" wx:for="{{calendars}}" wx:key="id"
+      bindtap="openCalendar" data-id="{{item.id}}">
+      <view class="cal-icon" style="background:{{item.isCreator ? '#4A90D9' : '#7BC47F'}}">
+        <text>{{item.name[0]}}</text>
+      </view>
+      <view class="cal-info">
+        <view class="cal-name">{{item.name}}</view>
+        <view class="cal-desc">{{item.description || '暂无描述'}}</view>
+        <view class="cal-meta">
+          <text class="role-tag {{item.isCreator ? 'role-creator' : 'role-member'}}">
+            {{item.isCreator ? '创建者' : '成员'}}
+          </text>
+          <text class="cal-date">{{item.created_at.substring(0,10)}}</text>
+        </view>
+      </view>
+      <text class="arrow">›</text>
+    </view>
+  </view>
+
+  <!-- 新建弹窗 -->
+  <view class="modal-mask" wx:if="{{showCreateModal}}" bindtap="closeCreate">
+    <view class="modal" catchtap="noop">
+      <view class="modal-title">新建日历</view>
+      <view class="field">
+        <text class="field-label">名称 *</text>
+        <input class="field-input" placeholder="请输入日历名称" value="{{newName}}" bindinput="onNameInput"/>
+      </view>
+      <view class="field">
+        <text class="field-label">描述</text>
+        <textarea class="field-textarea" placeholder="选填" value="{{newDesc}}" bindinput="onDescInput"/>
+      </view>
+      <view class="modal-btns">
+        <view class="modal-btn cancel" bindtap="closeCreate">取消</view>
+        <view class="modal-btn confirm" bindtap="createCalendar">创建</view>
+      </view>
+    </view>
+  </view>
+</view>
