@@ -1,0 +1,81 @@
+<!-- pages/event-detail/event-detail.wxml -->
+<view class="page" wx:if="{{event}}">
+  <!-- 状态横幅 -->
+  <view class="status-banner status-{{event.status}} {{event.event_type=='assigned'?'status-assigned':''}}">
+    <text wx:if="{{event.event_type=='assigned'}}">📌 指派事件</text>
+    <text wx:elif="{{event.status=='pending'}}">⏳ 待审批</text>
+    <text wx:elif="{{event.status=='approved'}}">✅ 已通过</text>
+    <text wx:elif="{{event.status=='rejected'}}">❌ 已拒绝</text>
+  </view>
+
+  <!-- 基本信息 -->
+  <view class="card">
+    <view class="event-title">{{event.title}}</view>
+    <view class="info-row">
+      <text class="icon">🕐</text>
+      <view class="info-val">
+        <text>{{event.start_time}}</text>
+        <text class="arrow"> → </text>
+        <text>{{event.end_time}}</text>
+      </view>
+    </view>
+    <view wx:if="{{event.location}}" class="info-row">
+      <text class="icon">📍</text>
+      <text class="info-val">{{event.location}}</text>
+    </view>
+    <view wx:if="{{event.content}}" class="info-row">
+      <text class="icon">📝</text>
+      <text class="info-val">{{event.content}}</text>
+    </view>
+    <view class="info-row">
+      <text class="icon">👤</text>
+      <text class="info-val">创建者：{{event.creator_name}}</text>
+    </view>
+    <view class="info-row">
+      <text class="icon">🕓</text>
+      <text class="info-val">创建于 {{event.created_at}}</text>
+    </view>
+  </view>
+
+  <!-- 指派成员 -->
+  <view wx:if="{{event.event_type=='assigned' && event.assignees.length>0}}" class="card">
+    <view class="section-label">指派成员</view>
+    <view class="assignee-list">
+      <view class="assignee-item" wx:for="{{event.assignees}}" wx:key="id">
+        <image class="assignee-avatar" src="{{item.avatar_url}}" mode="aspectFill"/>
+        <text>{{item.nick_name}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 创建者审批操作 -->
+  <view wx:if="{{isCreator && event.status=='pending'}}" class="action-card">
+    <view class="action-title">审批操作</view>
+    <view class="action-row">
+      <view class="btn-approve" bindtap="approveEvent">✔ 通过</view>
+      <view class="btn-reject"  bindtap="showReject">✘ 拒绝</view>
+    </view>
+  </view>
+
+  <!-- 编辑/删除 -->
+  <view class="action-card">
+    <view wx:if="{{(isCreator || isEventOwner) && event.event_type!='assigned'}}"
+      class="btn-outline" bindtap="editEvent">编辑事件</view>
+    <view wx:if="{{isCreator || isEventOwner}}"
+      class="btn-danger-outline" bindtap="deleteEvent">删除事件</view>
+  </view>
+
+  <!-- 拒绝弹窗 -->
+  <view class="modal-mask" wx:if="{{showRejectModal}}" bindtap="closeReject">
+    <view class="modal" catchtap="noop">
+      <view class="modal-title">拒绝原因</view>
+      <textarea class="reject-input" placeholder="选填，填写拒绝原因" value="{{rejectReason}}" bindinput="onReasonInput"/>
+      <view class="modal-btns">
+        <view class="modal-btn cancel" bindtap="closeReject">取消</view>
+        <view class="modal-btn reject" bindtap="rejectEvent">确认拒绝</view>
+      </view>
+    </view>
+  </view>
+</view>
+
+<view wx:else class="empty">加载中...</view>

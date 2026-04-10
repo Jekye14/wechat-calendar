@@ -57,7 +57,7 @@ Page({
 
 doLogin() {
     // 开发模式：直接用固定 openid 登录，无需真实微信授权
-    const mockCode = 'user_001'  // 改成不同字符串可模拟不同用户
+    const mockCode = 'student_001'  // 改成不同字符串可模拟不同用户
     app.request({
       url: '/auth/login',
       method: 'POST',

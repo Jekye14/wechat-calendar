@@ -273,9 +273,7 @@ Page({
   // ── 成员管理 ──────────────────────────────────────────────
 
   shareInvite() {
-    app.request({ url: `/calendars/${this.data.calId}/invite-token` })// shareInvite() 里 app.request(...) 的 then
-    .then(data => {
-      console.log('invite-token response:', data)   // <— 加这一行
+    app.request({ url: `/calendars/${this.data.calId}/invite-token` }).then(data => {
       app.globalData.inviteToken = data.token
       wx.showShareMenu({ withShareTicket: true })
       wx.showToast({ title: '请点击右上角分享', icon: 'none' })

@@ -1,11 +1,11 @@
-// pages/event/event.js  ── 创建/编辑普通事件
+// pages/assigned-event/assigned-event.js  ── 创建指派事件（仅创建者）
 const app = getApp()
 
 Page({
   data: {
     calId: null,
-    eventId: null,   // 有值则为编辑模式
-    isEdit: false,
+    members: [],
+    selectedIds: [],
     title: '',
     startDate: '',
     startTime: '09:00',
@@ -18,71 +18,62 @@ Page({
 
   onLoad(options) {
     const calId = parseInt(options.calId)
-    const eventId = options.eventId ? parseInt(options.eventId) : null
     const date = options.date || this.todayStr()
-    this.setData({
-      calId, eventId, isEdit: !!eventId,
-      startDate: date, endDate: date,
-    })
-    wx.setNavigationBarTitle({ title: eventId ? '编辑事件' : '创建事件' })
-    if (eventId) this.loadEvent(eventId)
+    this.setData({ calId, startDate: date, endDate: date })
+    wx.setNavigationBarTitle({ title: '创建指派事件' })
+    this.loadMembers()
   },
 
-  loadEvent(eventId) {
-    app.request({ url: `/calendars/${this.data.calId}/events/${eventId}` }).then(ev => {
-      const [sd, st] = ev.start_time.split(' ')
-      const [ed, et] = ev.end_time.split(' ')
-      this.setData({
-        title: ev.title,
-        startDate: sd, startTime: st.substring(0,5),
-        endDate: ed, endTime: et.substring(0,5),
-        location: ev.location,
-        content: ev.content,
-      })
+  loadMembers() {
+    app.request({ url: `/calendars/${this.data.calId}` }).then(data => {
+      const members = data.members.map(m => ({ ...m, selected: false }))
+      this.setData({ members })
     })
+  },
+
+  toggleMember(e) {
+    const idx = e.currentTarget.dataset.index
+    const members = this.data.members
+    members[idx].selected = !members[idx].selected
+    const selectedIds = members.filter(m => m.selected).map(m => m.id)
+    this.setData({ members, selectedIds })
   },
 
   onTitleInput(e)    { this.setData({ title: e.detail.value }) },
   onLocationInput(e) { this.setData({ location: e.detail.value }) },
   onContentInput(e)  { this.setData({ content: e.detail.value }) },
-
   onStartDateChange(e) { this.setData({ startDate: e.detail.value }) },
   onStartTimeChange(e) { this.setData({ startTime: e.detail.value }) },
   onEndDateChange(e)   { this.setData({ endDate: e.detail.value }) },
   onEndTimeChange(e)   { this.setData({ endTime: e.detail.value }) },
 
   submit() {
-    const { title, startDate, startTime, endDate, endTime, location, content, calId, eventId, isEdit, submitting } = this.data
+    const { title, startDate, startTime, endDate, endTime, location, content, calId, selectedIds, submitting } = this.data
     if (submitting) return
     if (!title.trim()) return wx.showToast({ title: '请输入主题', icon: 'none' })
     if (!startDate || !endDate) return wx.showToast({ title: '请选择时间', icon: 'none' })
+    if (selectedIds.length === 0) return wx.showToast({ title: '请至少选择一名成员', icon: 'none' })
 
     const startFull = `${startDate} ${startTime}:00`
     const endFull   = `${endDate} ${endTime}:00`
     if (startFull >= endFull) return wx.showToast({ title: '结束时间须晚于开始时间', icon: 'none' })
 
     this.setData({ submitting: true })
-    const method = isEdit ? 'PUT' : 'POST'
-    console.log(method)
-    const url = isEdit
-      ? `/calendars/${calId}/events/${eventId}`
-      : `/calendars/${calId}/events`
-
     app.request({
-      url, method,
+      url: `/calendars/${calId}/assigned-events`,
+      method: 'POST',
       data: {
         title: title.trim(),
         start_time: startFull,
         end_time: endFull,
         location: location.trim(),
         content: content.trim(),
+        assigned_member_ids: selectedIds,
       }
     }).then(() => {
-      wx.showToast({ title: isEdit ? '修改成功' : '创建成功，等待审批' })
-      setTimeout(() => wx.navigateBack(), 1200)
-    }).catch(() => {
-      this.setData({ submitting: false })
-    })
+      wx.showToast({ title: '指派事件已创建并通知成员' })
+      setTimeout(() => wx.navigateBack(), 1500)
+    }).catch(() => this.setData({ submitting: false }))
   },
 
   todayStr() {

@@ -63,7 +63,6 @@ Page({
 
     this.setData({ submitting: true })
     const method = isEdit ? 'PUT' : 'POST'
-    console.log(method)
     const url = isEdit
       ? `/calendars/${calId}/events/${eventId}`
       : `/calendars/${calId}/events`
