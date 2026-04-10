@@ -4,6 +4,7 @@
   <view class="status-banner status-{{event.status}} {{event.event_type=='assigned'?'status-assigned':''}}">
     <text wx:if="{{event.event_type=='assigned'}}">📌 指派事件</text>
     <text wx:elif="{{event.status=='pending'}}">⏳ 待审批</text>
+    <text wx:elif="{{event.status=='delete_pending'}}">🗑️ 删除待审批</text>
     <text wx:elif="{{event.status=='approved'}}">✅ 已通过</text>
     <text wx:elif="{{event.status=='rejected'}}">❌ 已拒绝</text>
   </view>
@@ -56,6 +57,27 @@
       <view class="btn-reject"  bindtap="showReject">✘ 拒绝</view>
     </view>
   </view>
+<!-- 删除审批操作（创建者对delete_pending状态的事件） -->
+<view wx:if="{{isCreator && event.status=='delete_pending'}}" class="action-card">
+  <view class="action-title">删除审批</view>
+  <view class="section-desc">成员申请删除此事件</view>
+  <view class="action-row">
+    <view class="btn-approve" bindtap="approveDeletion">✔ 同意删除</view>
+    <view class="btn-reject" bindtap="showRejectDeletion">✘ 驳回</view>
+  </view>
+</view>
+
+<!-- 删除审批驳回弹窗 -->
+<view class="modal-mask" wx:if="{{showRejectDeletionModal}}" bindtap="closeRejectDeletion">
+  <view class="modal" catchtap="noop">
+    <view class="modal-title">拒绝删除</view>
+    <textarea class="reject-input" placeholder="选填，填写拒绝原因" value="{{rejectDeletionReason}}" bindinput="onRejectDeletionInput"/>
+    <view class="modal-btns">
+      <view class="modal-btn cancel" bindtap="closeRejectDeletion">取消</view>
+      <view class="modal-btn reject" bindtap="rejectDeletion">确认驳回</view>
+    </view>
+  </view>
+</view>
 
   <!-- 编辑/删除 -->
   <view class="action-card">
