@@ -91,7 +91,7 @@ class Event(BaseModel):
     end_time: str
     location: str
     content: str
-    status: str           # pending / approved / rejected
+    status: str           # pending / approved / rejected / delete_pending
     event_type: str       # normal / assigned
     assignees: list[dict] = []
     created_at: str
@@ -105,7 +105,7 @@ class RejectRequest(BaseModel):
 class Notification(BaseModel):
     id: int
     user_id: int
-    type: str             # new_event / approved / rejected / assigned
+    type: str             # new_event / approved / rejected / assigned / update_request / delete_request
     title: str
     content: str
     is_read: int

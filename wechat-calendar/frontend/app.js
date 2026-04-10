@@ -3,7 +3,7 @@ App({
   globalData: {
     openid: '',
     userInfo: null,
-    baseUrl: 'http://192.168.56.1:8080',  // 替换为你的服务器地址
+    baseUrl: 'http://localhost:8080',  // 替换为你的服务器地址
   },
 
   onLaunch() {

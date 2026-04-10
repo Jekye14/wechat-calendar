@@ -157,6 +157,7 @@ def list_events(cal_id: int, user=Depends(get_current_user)):
         raise HTTPException(status_code=403, detail="无权访问")
     return db.get_calendar_events(cal_id)
 
+# 更新事件
 @app.put("/calendars/{cal_id}/events/{event_id}", response_model=schemas.Event)
 def update_event(cal_id: int, event_id: int, body: schemas.UpdateEventRequest, user=Depends(get_current_user)):
     cal = db.get_calendar(cal_id)
@@ -179,14 +180,46 @@ def update_event(cal_id: int, event_id: int, body: schemas.UpdateEventRequest, u
 
     if not is_creator:
         conflicts = db.check_time_conflict_with_creator(
-            cal_id, cal["creator_id"], new_start, new_end, event_id)
+            cal_id, cal["creator_id"], new_start, new_end, event_id
+        )
         if conflicts:
-            raise HTTPException(status_code=409,
-                detail=f"与创建者事件时间冲突：{conflicts[0]['title']}")
+            raise HTTPException(
+                status_code=409,
+                detail=f"与创建者事件时间冲突：{conflicts[0]['title']}"
+            )
 
-    new_status = "pending" if (not is_creator and (body.start_time or body.end_time)) else event["status"]
-    return db.update_event(event_id, body, new_status)
+    # 仅在确实有字段变化时才通知（避免空更新/同值更新）
+    incoming = body.model_dump(exclude_unset=True)
+    comparable_fields = ["title", "start_time", "end_time", "location", "content"]
 
+    def _normalize(v):
+        return "" if v is None else v
+
+    has_real_changes = any(
+        field in incoming and _normalize(incoming[field]) != _normalize(event[field])
+        for field in comparable_fields
+    )
+
+    # 成员改时间 -> 待审批；其余保持原状态
+    changed_time = ("start_time" in incoming and incoming["start_time"] != event["start_time"]) or \
+                   ("end_time" in incoming and incoming["end_time"] != event["end_time"])
+    new_status = "pending" if (not is_creator and changed_time) else event["status"]
+
+    updated_event = db.update_event(event_id, body, new_status)
+
+    if (not is_creator) and has_real_changes:
+        action = "修改了事件时间，待你审批" if changed_time else "更新了事件内容"
+        db.create_notification(
+            user_id=cal["creator_id"], type="update_request",
+            title="事件更新通知",
+            content=f"成员「{user['nick_name']}」{action}：「{updated_event['title']}」",
+            ref_event_id=event_id, ref_cal_id=cal_id,
+        )
+
+    return updated_event
+
+
+# 删除事件
 @app.delete("/calendars/{cal_id}/events/{event_id}")
 def delete_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
     cal = db.get_calendar(cal_id)
@@ -201,12 +234,34 @@ def delete_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
 
     if not is_creator and not is_event_owner:
         raise HTTPException(status_code=403, detail="无权删除他人事件")
+    if not is_creator and event["event_type"] == "assigned":
+        raise HTTPException(status_code=403, detail="指派事件仅创建者可删除")
 
-    db.delete_event(event_id)
-    return {"ok": True}
+    # 创建者可直接删除
+    if is_creator:
+        db.delete_event(event_id)
+        return {"ok": True, "message": "删除成功"}
 
-# ── 审批 ──────────────────────────────────────────────────────────
+    # 新规则：未通过(rejected)事件，成员可直接删除，无需审批
+    if event["status"] == "rejected":
+        db.delete_event(event_id)
+        return {"ok": True, "message": "未通过事件已删除"}
 
+    # 其余成员删除走删除审批：新增状态 delete_pending
+    if event["status"] == "delete_pending":
+        return {"ok": True, "message": "删除申请已提交，等待审批"}
+
+    db.update_event_status(event_id, "delete_pending")
+    db.create_notification(
+        user_id=cal["creator_id"], type="delete_request",
+        title="事件删除待审批",
+        content=f"成员「{user['nick_name']}」申请删除「{event['title']}」，请审批。",
+        ref_event_id=event_id, ref_cal_id=cal_id,
+    )
+    return {"ok": True, "message": "删除申请已提交，待创建者审批"}
+
+
+# 同意审批（合并：普通审批通过 + 删除审批通过）
 @app.post("/calendars/{cal_id}/events/{event_id}/approve")
 def approve_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
     cal = db.get_calendar(cal_id)
@@ -215,8 +270,22 @@ def approve_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
     event = db.get_event(event_id)
     if not event or event["calendar_id"] != cal_id:
         raise HTTPException(status_code=404, detail="事件不存在")
+
+    # 删除审批通过：直接删除事件
+    if event["status"] == "delete_pending":
+        db.delete_event(event_id)
+        db.create_notification(
+            user_id=event["creator_id"], type="approved",
+            title="删除申请已通过",
+            content=f"你在「{cal['name']}」申请删除的事件「{event['title']}」已通过并删除。",
+            ref_event_id=event_id, ref_cal_id=cal_id,
+        )
+        return {"ok": True, "message": "删除申请已通过，事件已删除"}
+
+    # 普通待审批通过
     if event["status"] != "pending":
-        raise HTTPException(status_code=400, detail="事件不在待审批状态")
+        raise HTTPException(status_code=400, detail="事件不在可审批状态")
+
     db.update_event_status(event_id, "approved")
     db.create_notification(
         user_id=event["creator_id"], type="approved",
@@ -224,8 +293,10 @@ def approve_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
         content=f"你在「{cal['name']}」创建的事件「{event['title']}」已通过审批。",
         ref_event_id=event_id, ref_cal_id=cal_id,
     )
-    return {"ok": True}
+    return {"ok": True, "message": "审批通过"}
 
+
+# 拒绝审批（合并：普通审批拒绝 + 删除审批驳回）
 @app.post("/calendars/{cal_id}/events/{event_id}/reject")
 def reject_event(cal_id: int, event_id: int, body: schemas.RejectRequest, user=Depends(get_current_user)):
     cal = db.get_calendar(cal_id)
@@ -234,14 +305,29 @@ def reject_event(cal_id: int, event_id: int, body: schemas.RejectRequest, user=D
     event = db.get_event(event_id)
     if not event or event["calendar_id"] != cal_id:
         raise HTTPException(status_code=404, detail="事件不存在")
+
+    reason = body.reason or "无"
+
+    # 删除审批驳回：恢复为 approved（原事件继续保留）
+    if event["status"] == "delete_pending":
+        db.update_event_status(event_id, "approved")
+        db.create_notification(
+            user_id=event["creator_id"], type="rejected",
+            title="删除申请未通过",
+            content=f"你在「{cal['name']}」申请删除的事件「{event['title']}」未通过。原因：{reason}",
+            ref_event_id=event_id, ref_cal_id=cal_id,
+        )
+        return {"ok": True, "message": "删除申请已驳回"}
+
+    # 普通审批拒绝
     db.update_event_status(event_id, "rejected")
     db.create_notification(
         user_id=event["creator_id"], type="rejected",
         title="事件审批未通过",
-        content=f"你在「{cal['name']}」创建的事件「{event['title']}」审批未通过。原因：{body.reason or '无'}",
+        content=f"你在「{cal['name']}」创建的事件「{event['title']}」审批未通过。原因：{reason}",
         ref_event_id=event_id, ref_cal_id=cal_id,
     )
-    return {"ok": True}
+    return {"ok": True, "message": "审批已拒绝"}
 
 # ── 指派事件（附加功能2） ─────────────────────────────────────────
 
