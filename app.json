@@ -1,0 +1,41 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/calendar/calendar",
+    "pages/event/event",
+    "pages/event-detail/event-detail",
+    "pages/join/join",
+    "pages/notification/notification",
+    "pages/assigned-event/assigned-event"
+  ],
+  "window": {
+    "backgroundTextStyle": "light",
+    "navigationBarBackgroundColor": "#4A90D9",
+    "navigationBarTitleText": "团队日历",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#f5f5f5"
+  },
+  "tabBar": {
+    "color": "#999",
+    "selectedColor": "#4A90D9",
+    "backgroundColor": "#fff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "日历",
+        "iconPath": "images/calendar.png",
+        "selectedIconPath": "images/calendar_active.png"
+      },
+      {
+        "pagePath": "pages/notification/notification",
+        "text": "通知",
+        "iconPath": "images/bell.png",
+        "selectedIconPath": "images/bell_active.png"
+      }
+    ]
+  },
+  "sitemapLocation": "sitemap.json",
+  "style": "v2",
+  "lazyCodeLoading": "requiredComponents"
+}
