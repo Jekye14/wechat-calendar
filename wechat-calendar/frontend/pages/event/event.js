@@ -28,18 +28,19 @@ Page({
     if (eventId) this.loadEvent(eventId)
   },
 
-  loadEvent(eventId) {
-    app.request({ url: `/calendars/${this.data.calId}/events/${eventId}` }).then(ev => {
-      const [sd, st] = ev.start_time.split(' ')
-      const [ed, et] = ev.end_time.split(' ')
-      this.setData({
-        title: ev.title,
-        startDate: sd, startTime: st.substring(0,5),
-        endDate: ed, endTime: et.substring(0,5),
-        location: ev.location,
-        content: ev.content,
-      })
-    })
+  parseTime(dtStr) {
+    // 支持 "2025-03-15 09:30:00" 和 ISO "2025-03-15T09:30:00"
+    if (!dtStr) return { h: 0, m: 0 }
+  
+    let timePart = ''
+    if (dtStr.includes('T')) {
+      timePart = dtStr.split('T')[1] || ''
+    } else {
+      timePart = dtStr.split(' ')[1] || ''
+    }
+  
+    const tp = (timePart || '00:00:00').split(':')
+    return { h: parseInt(tp[0] || 0), m: parseInt(tp[1] || 0) }
   },
 
   onTitleInput(e)    { this.setData({ title: e.detail.value }) },

@@ -43,7 +43,7 @@ class CalendarMember(BaseModel):
     id: int
     nick_name: str
     avatar_url: str
-    joined_at: str
+    joined_at: datetime
 
 class CalendarDetail(BaseModel):
     id: int
@@ -96,7 +96,7 @@ class Event(BaseModel):
     event_type: str       # normal / assigned
     assignees: list[dict] = []
     created_at: datetime
-    updated_at: str
+    updated_at: datetime
 
 class RejectRequest(BaseModel):
     reason: Optional[str] = ""

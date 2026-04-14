@@ -346,10 +346,18 @@ Page({
   },
 
   parseTime(dtStr) {
-    // "2025-03-15 09:30:00"
-    const parts = dtStr.split(' ')
-    const tp = (parts[1] || '00:00:00').split(':')
-    return { h: parseInt(tp[0]||0), m: parseInt(tp[1]||0) }
+    // 支持 "2025-03-15 09:30:00" 和 ISO "2025-03-15T09:30:00"
+    if (!dtStr) return { h: 0, m: 0 }
+  
+    let timePart = ''
+    if (dtStr.includes('T')) {
+      timePart = dtStr.split('T')[1] || ''
+    } else {
+      timePart = dtStr.split(' ')[1] || ''
+    }
+  
+    const tp = (timePart || '00:00:00').split(':')
+    return { h: parseInt(tp[0] || 0), m: parseInt(tp[1] || 0) }
   },
 
   minToLabel(mins) {
