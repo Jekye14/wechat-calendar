@@ -3,6 +3,7 @@ Pydantic 请求/响应模型
 """
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 
 # ── 认证 ────────────────────────────────────────────────────
 
@@ -36,7 +37,7 @@ class Calendar(BaseModel):
     name: str
     description: str
     creator_id: int
-    created_at: str
+    created_at: datetime
 
 class CalendarMember(BaseModel):
     id: int
@@ -49,7 +50,7 @@ class CalendarDetail(BaseModel):
     name: str
     description: str
     creator_id: int
-    created_at: str
+    created_at: datetime
     members: list[dict]
 
 # ── 邀请 ────────────────────────────────────────────────────
@@ -94,7 +95,7 @@ class Event(BaseModel):
     status: str           # pending / approved / rejected / delete_pending
     event_type: str       # normal / assigned
     assignees: list[dict] = []
-    created_at: str
+    created_at: datetime
     updated_at: str
 
 class RejectRequest(BaseModel):
@@ -111,4 +112,4 @@ class Notification(BaseModel):
     is_read: int
     ref_event_id: Optional[int]
     ref_cal_id: Optional[int]
-    created_at: str
+    created_at: datetime
