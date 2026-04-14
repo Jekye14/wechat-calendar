@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(title="微信日历小程序API", lifespan=lifespan)
-
+print("BOOT MARK: 2026-04-14 v0.1")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
