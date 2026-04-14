@@ -3,6 +3,9 @@
 """
 import httpx
 import os
+import logging
+
+logger = logging.getLogger("uvicorn.error")
 
 APPID = os.environ.get("WX_APPID", "YOUR_APPID")
 SECRET = os.environ.get("WX_SECRET", "YOUR_SECRET")
@@ -23,12 +26,10 @@ def code2openid(code: str) -> str | None:
     try:
         resp = httpx.get(url, params=params, timeout=5)
         data = resp.json()
-        print("jscode2session response:", data)
-        openid = data.get("openid")
-        if not openid:
-            print("Error in jscode2session:, code=", code, "data=", data)
-        return openid
+        logger.info("jscode2session status=%s data=%s", resp.status_code, data)
+        return data.get("openid")
     except Exception:
+        logger.exception("jscode2session exception: %s", e)
         return None
 
 def send_subscribe_message(openid: str, template_id: str, data: dict, page: str = ""):
