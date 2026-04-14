@@ -27,25 +27,17 @@ App({
   },
 
   request(options) {
-    const openid = this.globalData.openid
+    // 这里的 const openid = this.globalData.openid 可以删掉了
     return new Promise((resolve, reject) => {
       wx.cloud.callContainer({
         config: { env: this.globalData.cloudEnv },
-
-        // 直接用 options.url
         path: options.url,
-
         method: options.method || 'GET',
         data: options.data,
         header: {
           'Content-Type': 'application/json',
-
-          // 云托管必须带
           'X-WX-SERVICE': this.globalData.serviceName,
-
-          // 兼容你当前后端鉴权（依赖 Header x_user_openid）
-          'x-user-openid': openid,
-
+          // 删除 'x-user-openid': openid, <--- 把这行删掉！
           ...options.header,
         },
         success(res) {

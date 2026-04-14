@@ -26,19 +26,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def get_current_user(x_user_openid: str = Header(...)):
-    user = db.get_user_by_openid(x_user_openid)
+
+def get_current_user(x_wx_openid: str = Header(default=None)):
+    if not x_wx_openid:
+        raise HTTPException(status_code=401, detail="未授权，缺少 X-WX-OPENID 请求头")
+
+    user = db.get_user_by_openid(x_wx_openid)
     if not user:
-        raise HTTPException(status_code=401, detail="用户未登录")
+        raise HTTPException(status_code=401, detail="用户未注册/未登录")
     return user
 
 # ── 认证 ──────────────────────────────────────────────────────────
 
 @app.post("/auth/login", response_model=schemas.LoginResponse)
-def login(body: schemas.LoginRequest):
-    openid = wechat.code2openid(body.code)
+def login(body: schemas.LoginRequest, x_wx_openid: str = Header(default=None)):
+    # 2. 删除原有的 wechat.code2openid(body.code)
+    # 直接使用云托管网关注入的 openid
+    openid = x_wx_openid
+
     if not openid:
-        raise HTTPException(status_code=400, detail="微信登录失败")
+        # 如果本地开发测试没有经过微信网关，可以做个降级（可选）
+        raise HTTPException(status_code=400, detail="未获取到微信 OpenID，请确保使用 wx.cloud.callContainer 发起请求")
+
     user = db.get_or_create_user(openid, body.nick_name, body.avatar_url)
     return {"openid": openid, "user": user}
 

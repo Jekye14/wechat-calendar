@@ -24,66 +24,58 @@ Page({
     if (app.globalData.openid) this.loadCalendars()
   },
   doLogin() {
-    wx.login({
-      success: (res) => {
-        if (!res.code) {
-          wx.showToast({ title: '登录失败：无code', icon: 'none' })
-          return
-        }
-  
-        app.request({
-          url: '/auth/login',
-          method: 'POST',
-          data: {
-            code: res.code,
-            nick_name: '',
-            avatar_url: '',
-          }
-        }).then(data => {
-          app.globalData.openid = data.openid
-          app.globalData.userInfo = data.user
-          wx.setStorageSync('openid', data.openid)
-          wx.setStorageSync('userInfo', data.user)
-          this.setData({ userInfo: data.user })
-          this.loadCalendars()
-        }).catch((e) => {
-          console.log('login failed:', e)
-          wx.showToast({ title: '登录失败', icon: 'none' })
-        })
-      },
-      fail: (err) => {
-        console.log('wx.login fail:', err)
-        wx.showToast({ title: '微信登录失败', icon: 'none' })
+    // 直接发起请求，网关会自动鉴权并把 X-WX-OPENID 传给后端
+    app.request({
+      url: '/auth/login',
+      method: 'POST',
+      data: {
+        // code 已经不需要传了
+        nick_name: '微信用户',
+        avatar_url: '',
       }
+    }).then(data => {
+      app.globalData.openid = data.openid
+      app.globalData.userInfo = data.user
+      wx.setStorageSync('openid', data.openid)
+      wx.setStorageSync('userInfo', data.user)
+      this.setData({ userInfo: data.user })
+      this.loadCalendars()
+    }).catch((e) => {
+      console.log('login failed:', e)
+      wx.showToast({ title: '登录失败', icon: 'none' })
     })
   },
 //   doLogin() {
 //     wx.login({
 //       success: (res) => {
-//         wx.getUserProfile({
-//           desc: '用于完善用户信息',
-//           success: (profileRes) => {
-//             app.request({
-//               url: '/auth/login',
-//               method: 'POST',
-//               data: {
-//                 code: res.code,
-//                 nick_name: profileRes.userInfo.nickName,
-//                 avatar_url: profileRes.userInfo.avatarUrl,
-//               }
-//             }).then(data => {
-//               app.globalData.openid = data.openid
-//               app.globalData.userInfo = data.user
-//               wx.setStorageSync('openid', data.openid)
-//               wx.setStorageSync('userInfo', data.user)
-//               this.setData({ userInfo: data.user })
-//               this.loadCalendars()
-//             })
-//           },
-//           fail: () => {
-//             wx.showToast({ title: '需要授权才能使用', icon: 'none' })
+//         if (!res.code) {
+//           wx.showToast({ title: '登录失败：无code', icon: 'none' })
+//           return
+//         }
+  
+//         app.request({
+//           url: '/auth/login',
+//           method: 'POST',
+//           data: {
+//             code: res.code,
+//             nick_name: '',
+//             avatar_url: '',
 //           }
+//         }).then(data => {
+//           app.globalData.openid = data.openid
+//           app.globalData.userInfo = data.user
+//           wx.setStorageSync('openid', data.openid)
+//           wx.setStorageSync('userInfo', data.user)
+//           this.setData({ userInfo: data.user })
+//           this.loadCalendars()
+//         }).catch((e) => {
+//           console.log('login failed:', e)
+//           wx.showToast({ title: '登录失败', icon: 'none' })
 //         })
+//       },
+//       fail: (err) => {
+//         console.log('wx.login fail:', err)
+//         wx.showToast({ title: '微信登录失败', icon: 'none' })
 //       }
 //     })
 //   },
