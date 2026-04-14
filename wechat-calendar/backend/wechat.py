@@ -23,7 +23,11 @@ def code2openid(code: str) -> str | None:
     try:
         resp = httpx.get(url, params=params, timeout=5)
         data = resp.json()
-        return data.get("openid")
+        print("jscode2session response:", data)
+        openid = data.get("openid")
+        if not openid:
+            print("Error in jscode2session:, code=", code, "data=", data)
+        return openid
     except Exception:
         return None
 
