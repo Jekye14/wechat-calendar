@@ -8,7 +8,8 @@ from datetime import datetime
 # ── 认证 ────────────────────────────────────────────────────
 
 class LoginRequest(BaseModel):
-    code: str
+    # 将 code 改为带有默认值的可选字段，或者干脆直接删掉这一行
+    code: str = ""
     nick_name: str = ""
     avatar_url: str = ""
 
