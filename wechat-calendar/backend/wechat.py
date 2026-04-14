@@ -28,7 +28,7 @@ def code2openid(code: str) -> str | None:
         data = resp.json()
         logger.info("jscode2session status=%s data=%s", resp.status_code, data)
         return data.get("openid")
-    except Exception:
+    except Exception as e:
         logger.exception("jscode2session exception: %s", e)
         return None
 
