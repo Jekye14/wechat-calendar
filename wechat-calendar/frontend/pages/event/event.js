@@ -33,7 +33,7 @@ Page({
     this.loadCalendars(() => {
       if (!eventId && !fromCaptured) {
         const defaults = this.getDefaultTimeRange()
-        const selectedCalendarIds = calId ? [calId] : []
+        const selectedCalendarIds = calId ? [String(calId)] : []
         this.setData({ ...defaults, selectedCalendarIds })
       }
     })
@@ -91,7 +91,8 @@ Page({
 
   loadCalendars(done) {
     app.request({ url: '/calendars' }).then(data => {
-      this.setData({ calendars: data || [] })
+      const calendars = (data || []).map(item => ({ ...item, idStr: String(item.id) }))
+      this.setData({ calendars })
       done && done()
     }).catch(() => done && done())
   },
@@ -130,7 +131,7 @@ Page({
         startTime: start ? this.formatClock(start) : '09:00',
         endDate: end ? this.formatDate(end) : this.todayStr(),
         endTime: end ? this.formatClock(end) : '10:00',
-        selectedCalendarIds: this.data.calId ? [this.data.calId] : [],
+        selectedCalendarIds: this.data.calId ? [String(this.data.calId)] : [],
       })
     })
   },
@@ -144,7 +145,7 @@ Page({
   onEndDateChange(e)   { this.setData({ endDate: e.detail.value }) },
   onEndTimeChange(e)   { this.setData({ endTime: e.detail.value }) },
   onCalendarChange(e) {
-    this.setData({ selectedCalendarIds: (e.detail.value || []).map(v => parseInt(v)) })
+    this.setData({ selectedCalendarIds: e.detail.value || [] })
   },
 
   showBatchResult(result) {
@@ -197,7 +198,9 @@ Page({
     }
 
     const body = {
-      calendar_ids: selectedCalendarIds,
+      calendar_ids: (selectedCalendarIds || [])
+        .map(v => parseInt(v, 10))
+        .filter(v => !Number.isNaN(v)),
       title: title.trim(),
       start_time: startFull,
       end_time: endFull,
