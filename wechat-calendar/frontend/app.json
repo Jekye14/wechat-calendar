@@ -29,6 +29,12 @@
         "selectedIconPath": "images/calendar_active.png"
       },
       {
+        "pagePath": "pages/notification/notification",
+        "text": "通知",
+        "iconPath": "images/notify.png",
+        "selectedIconPath": "images/notify_active.png"
+      },
+      {
         "pagePath": "pages/captured/captured",
         "text": "捕获",
         "iconPath": "images/bell.png",

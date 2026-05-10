@@ -49,7 +49,7 @@
       <text class="label required">选择日历（可多选）</text>
       <checkbox-group bindchange="onCalendarChange">
         <label class="cal-option" wx:for="{{calendars}}" wx:key="id">
-          <checkbox value="{{item.id}}" checked="{{selectedCalendarIds.indexOf(item.id) >= 0}}" />
+          <checkbox value="{{item.idStr}}" checked="{{selectedCalendarIds.indexOf(item.idStr) >= 0}}" />
           <text class="cal-name">{{item.name}}</text>
         </label>
       </checkbox-group>
