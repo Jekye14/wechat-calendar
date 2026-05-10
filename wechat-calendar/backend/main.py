@@ -4,6 +4,9 @@
 运行: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 """
 
+from datetime import datetime, timedelta
+import secrets
+
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
@@ -11,6 +14,7 @@ import database as db
 import schemas
 import auth
 import wechat
+import time_extract
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -35,6 +39,77 @@ def get_current_user(x_wx_openid: str = Header(default=None)):
     if not user:
         raise HTTPException(status_code=401, detail="用户未注册/未登录")
     return user
+
+
+def get_current_app_user(authorization: str = Header(default=None)):
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="未授权，缺少 Bearer token")
+    token = authorization.split(" ", 1)[1].strip()
+    user = db.get_user_by_app_token(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="App Token 无效")
+    return user
+
+
+def parse_datetime_str(dt_str: str) -> datetime:
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M"):
+        try:
+            return datetime.strptime(dt_str, fmt)
+        except ValueError:
+            continue
+    raise HTTPException(status_code=400, detail=f"时间格式无效：{dt_str}")
+
+
+def normalize_end_time(start_time: str, end_time: str | None) -> str:
+    if end_time:
+        return end_time
+    start_dt = parse_datetime_str(start_time)
+    return (start_dt + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+
+
+def create_single_event_for_calendar(cal_id: int, payload: schemas.BatchCreateEventsRequest, user: dict):
+    cal = db.get_calendar(cal_id)
+    if not cal:
+        return {"calendar_id": cal_id, "calendar_name": f"#{cal_id}", "ok": False, "error": "日历不存在"}
+    if not db.is_member_or_creator(cal_id, user["id"], cal["creator_id"]):
+        return {"calendar_id": cal_id, "calendar_name": cal["name"], "ok": False, "error": "无权访问该日历"}
+
+    is_creator = cal["creator_id"] == user["id"]
+    final_end_time = normalize_end_time(payload.start_time, payload.end_time)
+    if not is_creator:
+        conflicts = db.check_time_conflict_with_creator(
+            cal_id, cal["creator_id"], payload.start_time, final_end_time, None
+        )
+        if conflicts:
+            return {
+                "calendar_id": cal_id,
+                "calendar_name": cal["name"],
+                "ok": False,
+                "error": f"与创建者事件时间冲突：{conflicts[0]['title']}（{conflicts[0]['start_time']} ~ {conflicts[0]['end_time']}）",
+            }
+
+    status = "approved" if is_creator else "pending"
+    event = db.create_event(
+        cal_id=cal_id,
+        creator_id=user["id"],
+        title=payload.title,
+        start_time=payload.start_time,
+        end_time=final_end_time,
+        location=payload.location,
+        content=payload.content,
+        status=status,
+        event_type="normal",
+    )
+    if not is_creator:
+        db.create_notification(
+            user_id=cal["creator_id"],
+            type="new_event",
+            title="新事件待审批",
+            content=f"成员「{user['nick_name']}」在「{cal['name']}」创建了事件「{payload.title}」，请审批。",
+            ref_event_id=event["id"],
+            ref_cal_id=cal_id,
+        )
+    return {"calendar_id": cal_id, "calendar_name": cal["name"], "ok": True, "event_id": event["id"]}
 
 # ── 认证 ──────────────────────────────────────────────────────────
 
@@ -133,9 +208,11 @@ def create_event(cal_id: int, body: schemas.CreateEventRequest, user=Depends(get
 
     is_creator = cal["creator_id"] == user["id"]
 
+    final_end_time = normalize_end_time(body.start_time, body.end_time)
+
     if not is_creator:
         conflicts = db.check_time_conflict_with_creator(
-            cal_id, cal["creator_id"], body.start_time, body.end_time, None)
+            cal_id, cal["creator_id"], body.start_time, final_end_time, None)
         if conflicts:
             raise HTTPException(status_code=409,
                 detail=f"与创建者事件时间冲突：{conflicts[0]['title']}（{conflicts[0]['start_time']} ~ {conflicts[0]['end_time']}）")
@@ -143,7 +220,7 @@ def create_event(cal_id: int, body: schemas.CreateEventRequest, user=Depends(get
     status = "approved" if is_creator else "pending"
     event = db.create_event(
         cal_id=cal_id, creator_id=user["id"], title=body.title,
-        start_time=body.start_time, end_time=body.end_time,
+        start_time=body.start_time, end_time=final_end_time,
         location=body.location, content=body.content,
         status=status, event_type="normal",
     )
@@ -406,3 +483,93 @@ def mark_all_read(user=Depends(get_current_user)):
 @app.get("/notifications/unread-count")
 def unread_count(user=Depends(get_current_user)):
     return {"count": db.get_unread_count(user["id"])}
+
+
+# ── App 绑定 / 通知捕获 ──────────────────────────────────────────────
+
+@app.post("/app/bind-code", response_model=schemas.CreateBindCodeResponse)
+def create_bind_code(user=Depends(get_current_user)):
+    bind_code = secrets.token_hex(3).upper()
+    expires_at = datetime.now() + timedelta(minutes=10)
+    db.create_bind_code(bind_code, user["id"], expires_at)
+    return {"bind_code": bind_code, "expires_at": expires_at}
+
+
+@app.post("/app/bind", response_model=schemas.AppBindResponse)
+def app_bind(body: schemas.AppBindRequest):
+    bind = db.consume_bind_code(body.bind_code.strip().upper())
+    if not bind:
+        raise HTTPException(status_code=400, detail="绑定码无效或已过期")
+    app_token = secrets.token_urlsafe(32)
+    db.create_app_token(app_token, bind["user_id"], body.device_id)
+    return {"app_token": app_token, "user_id": bind["user_id"]}
+
+
+@app.post("/app/notifications/ingest", response_model=schemas.CapturedNotification)
+def ingest_notification(body: schemas.AndroidIngestNotificationRequest, user=Depends(get_current_app_user)):
+    raw_text = f"{body.title or ''}\n{body.text or ''}".strip()
+    suggested_start, suggested_end = time_extract.extract_suggested_time(raw_text, body.posted_at)
+    inserted = db.insert_captured_notification(
+        user_id=user["id"],
+        package_name=body.package_name,
+        title=body.title,
+        text=body.text,
+        posted_at=body.posted_at,
+        dedupe_key=body.dedupe_key,
+        suggested_start_time=suggested_start,
+        suggested_end_time=suggested_end,
+    )
+    return inserted
+
+
+@app.get("/captured-notifications", response_model=list[schemas.CapturedNotification])
+def list_captured_notifications(user=Depends(get_current_user)):
+    return db.list_captured_notifications(user["id"], status="pending")
+
+
+@app.post("/captured-notifications/{captured_id}/dismiss")
+def dismiss_captured_notification(captured_id: int, user=Depends(get_current_user)):
+    notif = db.get_captured_notification(captured_id, user["id"])
+    if not notif:
+        raise HTTPException(status_code=404, detail="捕获通知不存在")
+    db.dismiss_captured_notification(captured_id, user["id"])
+    return {"ok": True}
+
+
+@app.post("/events/batch-create", response_model=schemas.BatchCreateEventsResponse)
+def batch_create_events(body: schemas.BatchCreateEventsRequest, user=Depends(get_current_user)):
+    if not body.calendar_ids:
+        raise HTTPException(status_code=400, detail="请至少选择一个日历")
+
+    results = []
+    all_ok = True
+    for cal_id in body.calendar_ids:
+        result = create_single_event_for_calendar(cal_id, body, user)
+        if not result["ok"]:
+            all_ok = False
+        results.append(result)
+    return {"all_ok": all_ok, "results": results}
+
+
+@app.post("/captured-notifications/{captured_id}/create-events", response_model=schemas.CreateEventsFromCapturedResponse)
+def create_events_from_captured(captured_id: int, body: schemas.BatchCreateEventsRequest, user=Depends(get_current_user)):
+    notif = db.get_captured_notification(captured_id, user["id"])
+    if not notif:
+        raise HTTPException(status_code=404, detail="捕获通知不存在")
+    if notif["status"] != "pending":
+        raise HTTPException(status_code=400, detail="该通知已处理")
+
+    req_payload = body
+    if not req_payload.title:
+        req_payload.title = notif["title"] or "通知日程"
+    if not req_payload.start_time:
+        if not notif.get("suggested_start_time"):
+            raise HTTPException(status_code=400, detail="缺少开始时间")
+        req_payload.start_time = notif["suggested_start_time"]
+    if not req_payload.end_time:
+        req_payload.end_time = notif.get("suggested_end_time")
+
+    batch_result = batch_create_events(req_payload, user)
+    if batch_result["all_ok"]:
+        db.mark_captured_notification_confirmed(captured_id, user["id"])
+    return batch_result

@@ -12,6 +12,7 @@
 """
 import os
 from typing import Optional, Any
+from datetime import datetime
 
 import pymysql
 
@@ -158,6 +159,48 @@ def init_db():
                 CONSTRAINT fk_notif_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 INDEX idx_notifications_user_created (user_id, created_at),
                 INDEX idx_notifications_user_read (user_id, is_read)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS bind_codes (
+                code VARCHAR(64) PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                expires_at DATETIME NOT NULL,
+                used_at DATETIME NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT fk_bind_codes_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                INDEX idx_bind_codes_user_expires (user_id, expires_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS app_tokens (
+                token VARCHAR(128) PRIMARY KEY,
+                user_id BIGINT NOT NULL,
+                device_id VARCHAR(255) NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT fk_app_tokens_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                INDEX idx_app_tokens_user_created (user_id, created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS captured_notifications (
+                id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                user_id BIGINT NOT NULL,
+                package_name VARCHAR(255) NOT NULL,
+                title VARCHAR(255) NOT NULL DEFAULT '',
+                text TEXT,
+                posted_at VARCHAR(64) NOT NULL,
+                received_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                dedupe_key VARCHAR(128) NOT NULL,
+                status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                suggested_start_time VARCHAR(64),
+                suggested_end_time VARCHAR(64),
+                CONSTRAINT fk_captured_notifications_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                UNIQUE KEY uniq_user_dedupe (user_id, dedupe_key),
+                INDEX idx_captured_notifications_user_status (user_id, status, received_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """)
 
@@ -471,3 +514,137 @@ def get_unread_count(user_id: int) -> int:
             WHERE user_id=%s AND is_read=0
         """, (user_id,))
         return int(row["cnt"]) if row else 0
+
+
+# ── App 绑定/令牌 ─────────────────────────────────────────────
+
+def create_bind_code(code: str, user_id: int, expires_at: datetime):
+    with get_conn() as conn:
+        _execute(conn, """
+            INSERT INTO bind_codes (code, user_id, expires_at, used_at)
+            VALUES (%s, %s, %s, NULL)
+            ON DUPLICATE KEY UPDATE
+                user_id=VALUES(user_id),
+                expires_at=VALUES(expires_at),
+                used_at=NULL
+        """, (code, user_id, expires_at))
+        conn.commit()
+
+
+def consume_bind_code(code: str) -> Optional[dict]:
+    with get_conn() as conn:
+        row = _fetchone(conn, """
+            SELECT * FROM bind_codes
+            WHERE code=%s
+              AND used_at IS NULL
+              AND expires_at > NOW()
+            LIMIT 1
+        """, (code,))
+        if not row:
+            return None
+        _execute(conn, "UPDATE bind_codes SET used_at=NOW() WHERE code=%s", (code,))
+        conn.commit()
+        return row_to_dict(row)
+
+
+def create_app_token(token: str, user_id: int, device_id: str):
+    with get_conn() as conn:
+        _execute(conn, """
+            INSERT INTO app_tokens (token, user_id, device_id)
+            VALUES (%s, %s, %s)
+        """, (token, user_id, device_id or "unknown"))
+        conn.commit()
+
+
+def get_user_by_app_token(token: str) -> Optional[dict]:
+    with get_conn() as conn:
+        row = _fetchone(conn, """
+            SELECT u.*
+            FROM app_tokens t
+            JOIN users u ON u.id = t.user_id
+            WHERE t.token=%s
+            LIMIT 1
+        """, (token,))
+        return row_to_dict(row)
+
+
+# ── 捕获通知 ─────────────────────────────────────────────────
+
+def insert_captured_notification(
+    user_id: int,
+    package_name: str,
+    title: str,
+    text: str,
+    posted_at: str,
+    dedupe_key: str,
+    suggested_start_time: Optional[str] = None,
+    suggested_end_time: Optional[str] = None,
+) -> dict:
+    with get_conn() as conn:
+        _execute(conn, """
+            INSERT INTO captured_notifications
+                (user_id, package_name, title, text, posted_at, dedupe_key, status, suggested_start_time, suggested_end_time)
+            VALUES (%s,%s,%s,%s,%s,%s,'pending',%s,%s)
+            ON DUPLICATE KEY UPDATE
+                id=LAST_INSERT_ID(id)
+        """, (
+            user_id, package_name, title or "", text or "", posted_at, dedupe_key,
+            suggested_start_time, suggested_end_time
+        ))
+        notif_id = _fetchone(conn, "SELECT LAST_INSERT_ID() AS id")["id"]
+        conn.commit()
+        row = _fetchone(conn, "SELECT * FROM captured_notifications WHERE id=%s", (notif_id,))
+        return row_to_dict(row)
+
+
+def list_captured_notifications(user_id: int, status: Optional[str] = None) -> list[dict]:
+    with get_conn() as conn:
+        if status:
+            rows = _fetchall(conn, """
+                SELECT * FROM captured_notifications
+                WHERE user_id=%s AND status=%s
+                ORDER BY received_at DESC, id DESC
+            """, (user_id, status))
+        else:
+            rows = _fetchall(conn, """
+                SELECT * FROM captured_notifications
+                WHERE user_id=%s
+                ORDER BY received_at DESC, id DESC
+            """, (user_id,))
+        return rows_to_list(rows)
+
+
+def get_captured_notification(notif_id: int, user_id: int) -> Optional[dict]:
+    with get_conn() as conn:
+        row = _fetchone(conn, """
+            SELECT * FROM captured_notifications
+            WHERE id=%s AND user_id=%s
+            LIMIT 1
+        """, (notif_id, user_id))
+        return row_to_dict(row)
+
+
+def dismiss_captured_notification(notif_id: int, user_id: int) -> bool:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE captured_notifications
+                SET status='dismissed'
+                WHERE id=%s AND user_id=%s AND status='pending'
+            """, (notif_id, user_id))
+            affected = cur.rowcount
+        conn.commit()
+        return affected > 0
+
+
+def mark_captured_notification_confirmed(notif_id: int, user_id: int) -> bool:
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE captured_notifications
+                SET status='confirmed'
+                WHERE id=%s AND user_id=%s AND status='pending'
+            """, (notif_id, user_id))
+            affected = cur.rowcount
+        conn.commit()
+        return affected > 0
