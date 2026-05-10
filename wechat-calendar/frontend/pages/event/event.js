@@ -6,6 +6,8 @@ Page({
     calId: null,
     eventId: null,   // 有值则为编辑模式
     isEdit: false,
+    fromCaptured: false,
+    capturedId: null,
     title: '',
     startDate: '',
     startTime: '09:00',
@@ -13,19 +15,31 @@ Page({
     endTime: '10:00',
     location: '',
     content: '',
+    calendars: [],
+    selectedCalendarIds: [],
     submitting: false,
   },
 
   onLoad(options) {
-    const calId = parseInt(options.calId)
+    const calId = options.calId ? parseInt(options.calId) : null
     const eventId = options.eventId ? parseInt(options.eventId) : null
-    const date = options.date || this.todayStr()
+    const fromCaptured = options.fromCaptured === '1'
+    const capturedId = options.capturedId ? parseInt(options.capturedId) : null
     this.setData({
-      calId, eventId, isEdit: !!eventId,
-      startDate: date, endDate: date,
+      calId, eventId, isEdit: !!eventId, fromCaptured, capturedId,
     })
     wx.setNavigationBarTitle({ title: eventId ? '编辑事件' : '创建事件' })
+
+    this.loadCalendars(() => {
+      if (!eventId && !fromCaptured) {
+        const defaults = this.getDefaultTimeRange()
+        const selectedCalendarIds = calId ? [calId] : []
+        this.setData({ ...defaults, selectedCalendarIds })
+      }
+    })
+
     if (eventId) this.loadEvent(eventId)
+    if (fromCaptured && capturedId) this.loadCaptured(capturedId)
   },
 
   parseTime(dtStr) {
@@ -43,6 +57,84 @@ Page({
     return { h: parseInt(tp[0] || 0), m: parseInt(tp[1] || 0) }
   },
 
+  parseDateTime(dtStr) {
+    if (!dtStr) return null
+    const normalized = dtStr.replace(/\//g, '-').replace('T', ' ')
+    const [datePart, timePart = '00:00:00'] = normalized.split(' ')
+    const [y, m, d] = datePart.split('-').map(v => parseInt(v))
+    const [hh, mm] = timePart.split(':').map(v => parseInt(v))
+    if (!y || !m || !d) return null
+    return new Date(y, m - 1, d, hh || 0, mm || 0, 0)
+  },
+
+  formatDate(d) {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  },
+
+  formatClock(d) {
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  },
+
+  getDefaultTimeRange() {
+    const now = new Date()
+    const start = new Date(now)
+    start.setMinutes(0, 0, 0)
+    start.setHours(start.getHours() + 1)
+    const end = new Date(start.getTime() + 60 * 60 * 1000)
+    return {
+      startDate: this.formatDate(start),
+      startTime: this.formatClock(start),
+      endDate: this.formatDate(end),
+      endTime: this.formatClock(end),
+    }
+  },
+
+  loadCalendars(done) {
+    app.request({ url: '/calendars' }).then(data => {
+      this.setData({ calendars: data || [] })
+      done && done()
+    }).catch(() => done && done())
+  },
+
+  loadCaptured(capturedId) {
+    app.request({ url: '/captured-notifications' }).then(list => {
+      const captured = (list || []).find(item => item.id === capturedId)
+      if (!captured) {
+        wx.showToast({ title: '捕获记录不存在', icon: 'none' })
+        return
+      }
+      const defaults = this.getDefaultTimeRange()
+      const startDt = this.parseDateTime(captured.suggested_start_time)
+      const endDt = this.parseDateTime(captured.suggested_end_time)
+      this.setData({
+        title: captured.title || '',
+        content: captured.text || '',
+        startDate: startDt ? this.formatDate(startDt) : defaults.startDate,
+        startTime: startDt ? this.formatClock(startDt) : defaults.startTime,
+        endDate: endDt ? this.formatDate(endDt) : defaults.endDate,
+        endTime: endDt ? this.formatClock(endDt) : defaults.endTime,
+        selectedCalendarIds: [],
+      })
+    })
+  },
+
+  loadEvent(eventId) {
+    app.request({ url: `/calendars/${this.data.calId}/events/${eventId}` }).then(event => {
+      const start = this.parseDateTime(event.start_time)
+      const end = this.parseDateTime(event.end_time)
+      this.setData({
+        title: event.title || '',
+        location: event.location || '',
+        content: event.content || '',
+        startDate: start ? this.formatDate(start) : this.todayStr(),
+        startTime: start ? this.formatClock(start) : '09:00',
+        endDate: end ? this.formatDate(end) : this.todayStr(),
+        endTime: end ? this.formatClock(end) : '10:00',
+        selectedCalendarIds: this.data.calId ? [this.data.calId] : [],
+      })
+    })
+  },
+
   onTitleInput(e)    { this.setData({ title: e.detail.value }) },
   onLocationInput(e) { this.setData({ location: e.detail.value }) },
   onContentInput(e)  { this.setData({ content: e.detail.value }) },
@@ -51,9 +143,29 @@ Page({
   onStartTimeChange(e) { this.setData({ startTime: e.detail.value }) },
   onEndDateChange(e)   { this.setData({ endDate: e.detail.value }) },
   onEndTimeChange(e)   { this.setData({ endTime: e.detail.value }) },
+  onCalendarChange(e) {
+    this.setData({ selectedCalendarIds: (e.detail.value || []).map(v => parseInt(v)) })
+  },
+
+  showBatchResult(result) {
+    const failed = (result.results || []).filter(r => !r.ok)
+    if (!failed.length) return Promise.resolve()
+    const lines = failed.map(r => `日历 ${r.calendar_name} 创建失败：${r.error || '未知错误'}`)
+    return new Promise(resolve => {
+      wx.showModal({
+        title: '部分创建失败',
+        content: lines.join('\n'),
+        showCancel: false,
+        success: () => resolve()
+      })
+    })
+  },
 
   submit() {
-    const { title, startDate, startTime, endDate, endTime, location, content, calId, eventId, isEdit, submitting } = this.data
+    const {
+      title, startDate, startTime, endDate, endTime, location, content,
+      calId, eventId, isEdit, fromCaptured, capturedId, submitting, selectedCalendarIds
+    } = this.data
     if (submitting) return
     if (!title.trim()) return wx.showToast({ title: '请输入主题', icon: 'none' })
     if (!startDate || !endDate) return wx.showToast({ title: '请选择时间', icon: 'none' })
@@ -61,29 +173,51 @@ Page({
     const startFull = `${startDate} ${startTime}:00`
     const endFull   = `${endDate} ${endTime}:00`
     if (startFull >= endFull) return wx.showToast({ title: '结束时间须晚于开始时间', icon: 'none' })
+    if (!isEdit && (!selectedCalendarIds || selectedCalendarIds.length === 0)) {
+      return wx.showToast({ title: '请至少选择一个日历', icon: 'none' })
+    }
 
     this.setData({ submitting: true })
-    const method = isEdit ? 'PUT' : 'POST'
-    console.log(method)
-    const url = isEdit
-      ? `/calendars/${calId}/events/${eventId}`
-      : `/calendars/${calId}/events`
+    if (isEdit) {
+      app.request({
+        url: `/calendars/${calId}/events/${eventId}`,
+        method: 'PUT',
+        data: {
+          title: title.trim(),
+          start_time: startFull,
+          end_time: endFull,
+          location: location.trim(),
+          content: content.trim(),
+        }
+      }).then(() => {
+        wx.showToast({ title: '修改成功' })
+        setTimeout(() => wx.navigateBack(), 1200)
+      }).catch(() => this.setData({ submitting: false }))
+      return
+    }
 
-    app.request({
-      url, method,
-      data: {
-        title: title.trim(),
-        start_time: startFull,
-        end_time: endFull,
-        location: location.trim(),
-        content: content.trim(),
-      }
-    }).then(() => {
-      wx.showToast({ title: isEdit ? '修改成功' : '创建成功，等待审批' })
-      setTimeout(() => wx.navigateBack(), 1200)
-    }).catch(() => {
-      this.setData({ submitting: false })
-    })
+    const body = {
+      calendar_ids: selectedCalendarIds,
+      title: title.trim(),
+      start_time: startFull,
+      end_time: endFull,
+      location: location.trim(),
+      content: content.trim(),
+    }
+    const url = fromCaptured
+      ? `/captured-notifications/${capturedId}/create-events`
+      : '/events/batch-create'
+
+    app.request({ url, method: 'POST', data: body }).then((result) => {
+      this.showBatchResult(result).then(() => {
+        if (result.all_ok) {
+          wx.showToast({ title: fromCaptured ? '创建并确认成功' : '创建成功' })
+          setTimeout(() => wx.navigateBack(), 1200)
+        } else {
+          this.setData({ submitting: false })
+        }
+      })
+    }).catch(() => this.setData({ submitting: false }))
   },
 
   todayStr() {
