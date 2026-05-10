@@ -1,15 +1,17 @@
 package com.example.calendar
 
+import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.navigation.fragment.findNavController
 import com.example.calendar.databinding.FragmentFirstBinding
+import kotlin.concurrent.thread
 
 /**
- * A simple [Fragment] subclass as the default destination in the navigation.
+ * 通知捕获 MVP 页面
  */
 class FirstFragment : Fragment() {
 
@@ -31,14 +33,68 @@ class FirstFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        val ctx = requireContext()
 
-        binding.buttonFirst.setOnClickListener {
-            findNavController().navigate(R.id.action_FirstFragment_to_SecondFragment)
+        binding.editBaseUrl.setText(AppPrefs.getBaseUrl(ctx))
+        binding.switchCapture.isChecked = AppPrefs.isCaptureEnabled(ctx)
+        val hasToken = AppPrefs.getAppToken(ctx).isNotBlank()
+        binding.textBindStatus.text = if (hasToken) "已绑定 App Token" else "未绑定"
+
+        binding.buttonSaveUrl.setOnClickListener {
+            AppPrefs.setBaseUrl(ctx, binding.editBaseUrl.text?.toString() ?: "")
+            appendLog("已保存后端地址")
         }
+
+        binding.buttonBind.setOnClickListener {
+            val bindCode = binding.editBindCode.text?.toString()?.trim().orEmpty()
+            if (bindCode.isBlank()) {
+                appendLog("请输入绑定码")
+                return@setOnClickListener
+            }
+            thread {
+                val result = ApiClient.bind(
+                    baseUrl = AppPrefs.getBaseUrl(ctx),
+                    bindCode = bindCode,
+                    deviceId = AppPrefs.getDeviceId(ctx)
+                )
+                activity?.runOnUiThread {
+                    if (result.ok) {
+                        AppPrefs.setAppToken(ctx, result.token)
+                        binding.textBindStatus.text = "已绑定 App Token"
+                    }
+                    appendLog(result.message)
+                }
+            }
+        }
+
+        binding.switchCapture.setOnCheckedChangeListener { _, checked ->
+            AppPrefs.setCaptureEnabled(ctx, checked)
+            appendLog(if (checked) "已开启后台捕获" else "已关闭后台捕获")
+        }
+
+        binding.buttonOpenNotificationAccess.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+        }
+
+        binding.buttonCaptureNow.setOnClickListener {
+            val ok = NotificationCaptureService.captureCurrentNotifications()
+            if (!ok) appendLog("监听服务未连接，请先开启通知访问并重新打开 App")
+        }
+
+        NotificationCaptureService.onUploadLog = { msg ->
+            activity?.runOnUiThread { appendLog(msg) }
+        }
+    }
+
+    private fun appendLog(msg: String) {
+        val old = binding.textLog.text?.toString().orEmpty()
+        val merged = if (old.isBlank()) msg else "$msg\n$old"
+        binding.textLog.text = merged.lines().take(12).joinToString("\n")
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
+        NotificationCaptureService.onUploadLog = null
         _binding = null
     }
 }
