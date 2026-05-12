@@ -47,12 +47,21 @@
 
     <view class="field" wx:if="{{!isEdit}}">
       <text class="label required">选择日历（可多选）</text>
-      <checkbox-group bindchange="onCalendarChange">
+      <!-- <checkbox-group bindchange="onCalendarChange">
         <view class="cal-option" wx:for="{{calendars}}" wx:key="id">
           <checkbox value="{{item.idStr}}" checked="{{selectedCalendarIds.indexOf(item.idStr) >= 0}}" />
           <text class="cal-name">{{item.name}}</text>
         </view>
-      </checkbox-group>
+      </checkbox-group> -->
+      <view style="color:#f00;font-size:24rpx;">
+        DEBUG selectedCalendarIds: {{selectedCalendarIds}}
+        </view>
+      <checkbox-group bindchange="onCalendarChange" value="{{selectedCalendarIds}}">
+        <view class="cal-option" wx:for="{{calendars}}" wx:key="id">
+            <checkbox value="{{item.idStr}}" />
+            <text class="cal-name">{{item.name}}</text>
+        </view>
+        </checkbox-group>
     </view>
   </view>
 

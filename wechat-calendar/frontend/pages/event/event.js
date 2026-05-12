@@ -147,11 +147,14 @@ Page({
   onStartTimeChange(e) { this.setData({ startTime: e.detail.value }) },
   onEndDateChange(e)   { this.setData({ endDate: e.detail.value }) },
   onEndTimeChange(e)   { this.setData({ endTime: e.detail.value }) },
+//   onCalendarChange(e) {
+//     // 关键：直接修改 this.data，不调用 setData。
+//     // setData 会触发重渲染，导致微信 checkbox 原生勾选状态与 checked 属性冲突产生闪动。
+//     // checkbox 的视觉勾选由原生机制管理，这里只负责保存数据供 submit() 使用。
+//     this.data.selectedCalendarIds = e.detail.value || []
+//   },
   onCalendarChange(e) {
-    // 关键：直接修改 this.data，不调用 setData。
-    // setData 会触发重渲染，导致微信 checkbox 原生勾选状态与 checked 属性冲突产生闪动。
-    // checkbox 的视觉勾选由原生机制管理，这里只负责保存数据供 submit() 使用。
-    this.data.selectedCalendarIds = e.detail.value || []
+    this.setData({ selectedCalendarIds: e.detail.value || [] })
   },
   
 
@@ -174,6 +177,7 @@ Page({
       title, startDate, startTime, endDate, endTime, location, content,
       calId, eventId, isEdit, fromCaptured, capturedId, submitting, selectedCalendarIds
     } = this.data
+    console.log('SUBMIT', Date.now())
     if (submitting) return
     if (!title.trim()) return wx.showToast({ title: '请输入主题', icon: 'none' })
     if (!startDate || !endDate) return wx.showToast({ title: '请选择时间', icon: 'none' })
