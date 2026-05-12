@@ -30,11 +30,10 @@ Page({
     })
     wx.setNavigationBarTitle({ title: eventId ? '编辑事件' : '创建事件' })
 
-    this.loadCalendars(() => {
+    const selectedCalendarIds = calId ? [String(calId)] : []
+    this.loadCalendars(selectedCalendarIds, () => {
       if (!eventId && !fromCaptured) {
-        const defaults = this.getDefaultTimeRange()
-        const selectedCalendarIds = calId ? [String(calId)] : []
-        this.setData({ ...defaults, selectedCalendarIds })
+        this.setData({ ...this.getDefaultTimeRange() })
       }
     })
 
@@ -89,10 +88,14 @@ Page({
     }
   },
 
-  loadCalendars(done) {
+  loadCalendars(selectedCalendarIds, done) {
     app.request({ url: '/calendars' }).then(data => {
       const calendars = (data || []).map(item => ({ ...item, idStr: String(item.id) }))
-      this.setData({ calendars })
+      const update = { calendars }
+      if (selectedCalendarIds !== undefined) {
+        update.selectedCalendarIds = selectedCalendarIds
+      }
+      this.setData(update)
       done && done()
     }).catch(() => done && done())
   },
@@ -145,8 +148,12 @@ Page({
   onEndDateChange(e)   { this.setData({ endDate: e.detail.value }) },
   onEndTimeChange(e)   { this.setData({ endTime: e.detail.value }) },
   onCalendarChange(e) {
-    this.setData({ selectedCalendarIds: e.detail.value || [] })
+    // 关键：直接修改 this.data，不调用 setData。
+    // setData 会触发重渲染，导致微信 checkbox 原生勾选状态与 checked 属性冲突产生闪动。
+    // checkbox 的视觉勾选由原生机制管理，这里只负责保存数据供 submit() 使用。
+    this.data.selectedCalendarIds = e.detail.value || []
   },
+  
 
   showBatchResult(result) {
     const failed = (result.results || []).filter(r => !r.ok)
@@ -221,6 +228,8 @@ Page({
         }
       })
     }).catch(() => this.setData({ submitting: false }))
+    console.log('selectedCalendarIds', selectedCalendarIds)
+    console.log('body.calendar_ids', body.calendar_ids)
   },
 
   todayStr() {

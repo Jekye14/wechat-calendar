@@ -144,7 +144,9 @@ Page({
       const start = this.parseTime(ev.start_time)
       const end   = this.parseTime(ev.end_time)
       const startMin = start.h * 60 + start.m
-      const endMin   = Math.min(end.h * 60 + end.m, 24 * 60)
+      // 如果结束时间<=开始时间（跨午夜），则可视结束为当天24:00
+      const rawEndMin = end.h * 60 + end.m
+      const endMin   = rawEndMin <= startMin ? 24 * 60 : Math.min(rawEndMin, 24 * 60)
       const duration = endMin - startMin
       const dateStr  = ev.start_time.substring(0,10)
       const dayIdx   = weekDays.findIndex(d => d.dateStr === dateStr)
