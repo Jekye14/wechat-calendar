@@ -76,6 +76,16 @@ class FirstFragment : Fragment() {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
 
+        binding.buttonPostTestNotification.setOnClickListener {
+            // Android 13+ 可能需要通知权限；如果你点了没出现通知，去系统设置给本 App 开通知权限
+            DebugNotification.post(
+                ctx,
+                title = "测试通知标题",
+                text = "测试通知正文：5月22日 15:30 开会（用于捕获与时间提取）"
+            )
+            appendLog("已发送本机测试通知（请下拉通知栏确认）")
+        }
+
         binding.buttonCaptureNow.setOnClickListener {
             val ok = NotificationCaptureService.captureCurrentNotifications()
             if (!ok) appendLog("监听服务未连接，请先开启通知访问并重新打开 App")
