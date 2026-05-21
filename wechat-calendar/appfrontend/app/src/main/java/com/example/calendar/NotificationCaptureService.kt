@@ -11,6 +11,7 @@ import java.util.concurrent.Executors
 class NotificationCaptureService : NotificationListenerService() {
 
     private val executor = Executors.newSingleThreadExecutor()
+    // 只捕获这几个主流办公和社交应用的通知，避免过多垃圾数据
     private val whitelist = setOf(
         "com.tencent.mm",
         "com.tencent.mobileqq",
@@ -42,12 +43,13 @@ class NotificationCaptureService : NotificationListenerService() {
         instance = null
         executor.shutdown()
     }
-
+    // 每当有新通知发布时触发
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+
         if (!AppPrefs.isCaptureEnabled(this)) return
         processAndUpload(sbn)
     }
-
+    // 处理通知内容并上传到服务器
     private fun processAndUpload(sbn: StatusBarNotification) {
         if (!whitelist.contains(sbn.packageName)) return
         val token = AppPrefs.getAppToken(this)

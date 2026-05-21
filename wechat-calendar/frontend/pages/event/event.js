@@ -95,8 +95,12 @@ Page({
       if (selectedCalendarIds !== undefined) {
         update.selectedCalendarIds = selectedCalendarIds
       }
-      this.setData(update)
-      done && done()
+      this.setData(update, () => {
+        if (update.selectedCalendarIds) {
+          this.setData({ selectedCalendarIds: update.selectedCalendarIds })
+        }
+        done && done()
+      })
     }).catch(() => done && done())
   },
 
@@ -148,13 +152,13 @@ Page({
   onEndDateChange(e)   { this.setData({ endDate: e.detail.value }) },
   onEndTimeChange(e)   { this.setData({ endTime: e.detail.value }) },
 //   onCalendarChange(e) {
-//     // 关键：直接修改 this.data，不调用 setData。
-//     // setData 会触发重渲染，导致微信 checkbox 原生勾选状态与 checked 属性冲突产生闪动。
-//     // checkbox 的视觉勾选由原生机制管理，这里只负责保存数据供 submit() 使用。
 //     this.data.selectedCalendarIds = e.detail.value || []
+//     console.log(this.data.selectedCalendarIds)
 //   },
   onCalendarChange(e) {
-    this.setData({ selectedCalendarIds: e.detail.value || [] })
+    const rawValues = (e && e.detail && e.detail.value) ? e.detail.value : []
+    const selectedCalendarIds = Array.from(new Set((rawValues || []).map(v => String(v))))
+    this.setData({ selectedCalendarIds })
   },
   
 

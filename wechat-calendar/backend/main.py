@@ -15,7 +15,11 @@ import schemas
 import auth
 import wechat
 import time_extract
+import os
+import logging
+import pymysql
 
+logger = logging.getLogger("uvicorn.error")
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     db.init_db()
@@ -488,12 +492,87 @@ def unread_count(user=Depends(get_current_user)):
 
 # ── App 绑定 / 通知捕获 ──────────────────────────────────────────────
 
+# @app.post("/app/bind-code", response_model=schemas.CreateBindCodeResponse)
+# def create_bind_code(user=Depends(get_current_user)):
+#     bind_code = secrets.token_hex(3).upper()
+#     expires_at = datetime.now() + timedelta(minutes=10)
+#     db.create_bind_code(bind_code, user["id"], expires_at)
+#     return {"bind_code": bind_code, "expires_at": expires_at}
+
 @app.post("/app/bind-code", response_model=schemas.CreateBindCodeResponse)
 def create_bind_code(user=Depends(get_current_user)):
     bind_code = secrets.token_hex(3).upper()
     expires_at = datetime.now() + timedelta(minutes=10)
+
     db.create_bind_code(bind_code, user["id"], expires_at)
+
+    # --- DEBUG: 写入后立刻回查（看是否真的入库 / 时间是否合理）
+    try:
+        with db.get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT NOW() AS now_time")
+                now_row = cur.fetchone()
+
+                cur.execute(
+                    "SELECT code, user_id, expires_at, used_at, created_at FROM bind_codes WHERE code=%s",
+                    (bind_code,),
+                )
+                row = cur.fetchone()
+        logger.info(
+            "[DEBUG bind-code] code=%s user_id=%s app_now=%s db_now=%s db_row=%s",
+            bind_code,
+            user.get("id"),
+            datetime.now().isoformat(),
+            (now_row or {}).get("now_time"),
+            row,
+        )
+    except Exception as e:
+        logger.exception("[DEBUG bind-code] db check failed: %s", e)
+    # --- DEBUG END
+
     return {"bind_code": bind_code, "expires_at": expires_at}
+
+@app.get("/app/debug/bind-code/{code}")
+def debug_bind_code(code: str):
+    """
+    调试接口：查看 bind_code 在 DB 中的记录状态
+    仅用于排查：写入是否成功 / 是否立刻过期 / 是否已被消费
+    """
+    code = (code or "").strip().upper()
+    with db.get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT NOW() AS now_time")
+            now_row = cur.fetchone()
+
+            cur.execute(
+                "SELECT code, user_id, expires_at, used_at, created_at FROM bind_codes WHERE code=%s",
+                (code,),
+            )
+            row = cur.fetchone()
+
+            cur.execute(
+                "SELECT code, user_id, expires_at, used_at, created_at FROM bind_codes "
+                "WHERE code=%s AND used_at IS NULL AND expires_at > NOW() LIMIT 1",
+                (code,),
+            )
+            valid_row = cur.fetchone()
+
+    return {
+        "input_code": code,
+        "db_now": (now_row or {}).get("now_time"),
+        "row": row,
+        "would_be_consumable": bool(valid_row),
+        "mysql_address": os.environ.get("MYSQL_ADDRESS"),
+        "mysql_database": os.environ.get("MYSQL_DATABASE"),
+    }
+
+@app.get("/app/debug/db-time")
+def debug_db_time():
+    with db.get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT NOW() AS now_time, @@system_time_zone AS system_tz, @@time_zone AS tz")
+            row = cur.fetchone()
+    return {"db": row, "app_now": datetime.now().isoformat()}
 
 
 @app.post("/app/bind", response_model=schemas.AppBindResponse)
