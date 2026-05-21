@@ -46,7 +46,7 @@
     <view class="divider" wx:if="{{!isEdit}}"></view>
 
     <view class="field" wx:if="{{!isEdit}}">
-      <!-- <text class="label required">选择日历（可多选）</text> -->
+      <text class="label required">选择日历（可多选，在日历界面创建时不要使用）</text>
       <!-- <checkbox-group bindchange="onCalendarChange">
         <view class="cal-option" wx:for="{{calendars}}" wx:key="id">
           <checkbox value="{{item.idStr}}" checked="{{selectedCalendarIds.indexOf(item.idStr) >= 0}}" />
@@ -62,12 +62,12 @@
             <text class="cal-name">{{item.name}}</text>
         </view>
         </checkbox-group> -->
-      <!-- <checkbox-group bindchange="onCalendarChange" value="{{selectedCalendarIds}}">
+      <checkbox-group bindchange="onCalendarChange" value="{{selectedCalendarIds}}">
         <label class="cal-option" wx:for="{{calendars}}" wx:key="id">
             <checkbox value="{{item.idStr}}" />
             <text class="cal-name">{{item.name}}</text>
         </label>
-        </checkbox-group>         -->
+        </checkbox-group>        
     </view>
   </view>
 

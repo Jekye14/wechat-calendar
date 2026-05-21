@@ -4,6 +4,14 @@ from typing import Optional
 
 
 DATE_TIME_PATTERNS = [
+    # 中文：x月xx日（周x）下午xx:xx[-xx:xx]
+    # 允许“日”和时间之间夹杂无关内容（如：括号、星期、上午/下午/晚上等）
+    re.compile(
+        r"(?P<month>\d{1,2})\s*月\s*(?P<day>\d{1,2})\s*日"
+        r"(?:[^\d]{0,20})?"  # 允许夹杂： （周五）下午  等非数字内容，最多 20 字符
+        r"(?P<start_h>\d{1,2})\s*:\s*(?P<start_m>\d{2})"
+        r"(?:\s*[-~至到]+\s*(?P<end_h>\d{1,2})\s*:\s*(?P<end_m>\d{2}))?"
+    ),
     # YYYY-MM-DD HH:MM [ - HH:MM ]
     re.compile(
         r"(?P<year>\d{4})[-/](?P<month>\d{1,2})[-/](?P<day>\d{1,2})\s+"

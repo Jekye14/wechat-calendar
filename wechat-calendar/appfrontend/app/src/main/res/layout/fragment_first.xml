@@ -19,7 +19,7 @@
             android:id="@+id/edit_base_url"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="http://10.0.2.2:8000"
+            android:hint="https://django-ifdx-26475-5-1316545348.sh.run.tcloudbase.com"
             android:inputType="textUri" />
 
         <Button

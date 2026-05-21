@@ -81,7 +81,7 @@ class FirstFragment : Fragment() {
             DebugNotification.post(
                 ctx,
                 title = "测试通知标题",
-                text = "测试通知正文：5月22日 15:30 开会（用于捕获与时间提取）"
+                text = "测试通知正文：05-22 15:30 开会（用于捕获与时间提取）"
             )
             appendLog("已发送本机测试通知（请下拉通知栏确认）")
         }
