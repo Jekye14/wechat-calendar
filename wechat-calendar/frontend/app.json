@@ -3,6 +3,7 @@
     "pages/index/index",
     "pages/calendar/calendar",
     "pages/event/event",
+    "pages/captured/captured",
     "pages/event-detail/event-detail",
     "pages/join/join",
     "pages/notification/notification",
@@ -30,6 +31,12 @@
       {
         "pagePath": "pages/notification/notification",
         "text": "通知",
+        "iconPath": "images/notify.png",
+        "selectedIconPath": "images/notify_active.png"
+      },
+      {
+        "pagePath": "pages/captured/captured",
+        "text": "捕获",
         "iconPath": "images/bell.png",
         "selectedIconPath": "images/bell_active.png"
       }

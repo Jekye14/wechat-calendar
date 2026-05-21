@@ -5,6 +5,9 @@
       <image class="avatar" src="{{userInfo.avatar_url || ''}}" mode="aspectFill"/>
       <text class="welcome">{{userInfo ? userInfo.nick_name : '请登录'}}</text>
     </view>
+      <!-- 新增：生成绑定码按钮（在 userInfo 右边） -->
+    <view class="header-btn header-btn-mid"   bindtap="generateBindCode">生成绑定码
+      </view>
     <view class="header-btn" bindtap="showCreate">+ 新建日历</view>
   </view>
 

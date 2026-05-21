@@ -142,4 +142,42 @@ Page({
       this.loadCalendars()
     })
   },
+  // 新增：生成绑定码（给 Android App 绑定用）
+  generateBindCode() {
+    app.request({
+      url: '/app/bind-code',
+      method: 'POST',
+      data: {} // 保持对象，别传空字符串
+    }).then(res => {
+      const code = res && res.bind_code
+      const expiresAt = res && (res.expires_at || res.expiresAt)
+      if (!code) {
+        wx.showToast({ title: '未获取到 bind_code', icon: 'none' })
+        return
+      }
+
+      // 复制到剪贴板，方便粘贴到 Android App
+      wx.setClipboardData({
+        data: code,
+        success: () => {
+          wx.showModal({
+            title: '绑定码已生成（已复制）',
+            content: `bind_code: ${code}\nexpires_at: ${expiresAt || ''}`,
+            showCancel: false
+          })
+          console.log(`bind_code: ${code}\nexpires_at: ${expiresAt || ''}`)
+        },
+        fail: () => {
+          wx.showModal({
+            title: '绑定码已生成',
+            content: `bind_code: ${code}\nexpires_at: ${expiresAt || ''}\n（复制失败，请手动复制）`,
+            showCancel: false
+          })
+        }
+      })
+    }).catch(e => {
+      console.log('bind-code failed:', e)
+      wx.showToast({ title: '生成绑定码失败', icon: 'none' })
+    })
+  },
 })
