@@ -254,6 +254,7 @@ def get_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
     if not event or event["calendar_id"] != cal_id:
         raise HTTPException(status_code=404, detail="事件不存在")
 
+    # TODO 未来需要优化，现在调用了两次数据库搜索，一次 get_event 一次 update_event
     # db.get_event 返回的字段可能不含 creator_name/assignees 等，
     # 但前端事件详情页使用的是 schemas.Event，所以这里用 update_event 返回的完整结构保持一致：
     return db.update_event(event_id, schemas.UpdateEventRequest(), event["status"])
