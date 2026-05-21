@@ -502,6 +502,16 @@ def unread_count(user=Depends(get_current_user)):
 @app.post("/app/bind-code", response_model=schemas.CreateBindCodeResponse)
 def create_bind_code(user=Depends(get_current_user)):
     bind_code = secrets.token_hex(3).upper()
+
+    row = db.create_bind_code(bind_code, user["id"])
+    # row 里应包含 expires_at（DB时间）
+    expires_at = row["expires_at"] if row else None
+
+    return {"bind_code": bind_code, "expires_at": expires_at}
+
+@app.post("/app/bind-code", response_model=schemas.CreateBindCodeResponse)
+def create_bind_code(user=Depends(get_current_user)):
+    bind_code = secrets.token_hex(3).upper()
     expires_at = datetime.now() + timedelta(minutes=10)
 
     db.create_bind_code(bind_code, user["id"], expires_at)

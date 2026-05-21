@@ -518,17 +518,40 @@ def get_unread_count(user_id: int) -> int:
 
 # ── App 绑定/令牌 ─────────────────────────────────────────────
 
-def create_bind_code(code: str, user_id: int, expires_at: datetime):
+# def create_bind_code(code: str, user_id: int, expires_at: datetime):
+#     with get_conn() as conn:
+#         _execute(conn, """
+#             INSERT INTO bind_codes (code, user_id, expires_at, used_at)
+#             VALUES (%s, %s, %s, NULL)
+#             ON DUPLICATE KEY UPDATE
+#                 user_id=VALUES(user_id),
+#                 expires_at=VALUES(expires_at),
+#                 used_at=NULL
+#         """, (code, user_id, expires_at))
+#         conn.commit()
+def create_bind_code(code: str, user_id: int) -> dict:
+    """
+    创建绑定码：expires_at 由数据库 NOW() 计算，避免应用/DB 时区不一致导致立刻过期
+    返回写入后的记录（包含 expires_at）
+    """
     with get_conn() as conn:
         _execute(conn, """
             INSERT INTO bind_codes (code, user_id, expires_at, used_at)
-            VALUES (%s, %s, %s, NULL)
+            VALUES (%s, %s, DATE_ADD(NOW(), INTERVAL 10 MINUTE), NULL)
             ON DUPLICATE KEY UPDATE
                 user_id=VALUES(user_id),
-                expires_at=VALUES(expires_at),
+                expires_at=DATE_ADD(NOW(), INTERVAL 10 MINUTE),
                 used_at=NULL
-        """, (code, user_id, expires_at))
+        """, (code, user_id))
         conn.commit()
+
+        row = _fetchone(conn, """
+            SELECT code, user_id, expires_at, used_at, created_at
+            FROM bind_codes
+            WHERE code=%s
+            LIMIT 1
+        """, (code,))
+        return row_to_dict(row)
 
 
 def consume_bind_code(code: str) -> Optional[dict]:
