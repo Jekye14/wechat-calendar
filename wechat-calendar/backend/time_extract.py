@@ -56,7 +56,8 @@ def _guess_year(month: int, day: int, base: datetime) -> int:
 def extract_suggested_time(text: str, posted_at: Optional[str] = None) -> tuple[Optional[str], Optional[str]]:
     if not text:
         return None, None
-
+    # normalize common Chinese punctuation
+    text = text.replace("：", ":").replace("－", "-").replace("—", "-").replace("～", "~")
     base_dt = datetime.now()
     if posted_at:
         for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y/%m/%d %H:%M:%S", "%Y/%m/%d %H:%M"):
