@@ -43,9 +43,36 @@
       <text class="label">内容</text>
       <textarea class="textarea" placeholder="选填，填写事件详细内容" value="{{content}}" bindinput="onContentInput"/>
     </view>
+    <view class="divider" wx:if="{{!isEdit}}"></view>
+
+    <view class="field" wx:if="{{!isEdit}}">
+      <text class="label required">选择日历（可多选，在日历界面创建时不要使用）</text>
+      <!-- <checkbox-group bindchange="onCalendarChange">
+        <view class="cal-option" wx:for="{{calendars}}" wx:key="id">
+          <checkbox value="{{item.idStr}}" checked="{{selectedCalendarIds.indexOf(item.idStr) >= 0}}" />
+          <text class="cal-name">{{item.name}}</text>
+        </view>
+      </checkbox-group> -->
+      <!-- <view style="color:#f00;font-size:24rpx;">
+        DEBUG selectedCalendarIds: {{selectedCalendarIds}}
+        </view>
+      <checkbox-group bindchange="onCalendarChange">
+        <view class="cal-option" wx:for="{{calendars}}" wx:key="idStr">
+            <checkbox value="{{item.idStr}}" checked="{{selectedCalendarIds.indexOf(item.idStr) >= 0}}" />
+            <text class="cal-name">{{item.name}}</text>
+        </view>
+        </checkbox-group> -->
+      <checkbox-group bindchange="onCalendarChange" value="{{selectedCalendarIds}}">
+        <label class="cal-option" wx:for="{{calendars}}" wx:key="id">
+            <checkbox value="{{item.idStr}}" />
+            <text class="cal-name">{{item.name}}</text>
+        </label>
+        </checkbox-group>        
+    </view>
   </view>
 
-  <view class="tip">注：成员创建的事件需创建者（导师）审批后生效，且不能与创建者事件时间冲突。</view>
+  <view class="tip" wx:if="{{!fromCaptured}}">注：成员创建的事件需创建者（导师）审批后生效，且不能与创建者事件时间冲突。</view>
+  <view class="tip" wx:if="{{fromCaptured}}">从捕获通知创建：默认不勾选日历，请至少选择一个。</view>
 
   <view class="submit-btn {{submitting?'disabled':''}}" bindtap="submit">
     {{submitting ? '提交中...' : (isEdit ? '保存修改' : '提交事件')}}

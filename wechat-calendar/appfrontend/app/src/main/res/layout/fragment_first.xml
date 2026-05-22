@@ -1,35 +1,92 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context=".FirstFragment">
+    android:padding="16dp">
 
-    <androidx.constraintlayout.widget.ConstraintLayout
+    <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:padding="16dp">
-
-        <Button
-            android:id="@+id/button_first"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="@string/next"
-            app:layout_constraintBottom_toTopOf="@id/textview_first"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent" />
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
 
         <TextView
-            android:id="@+id/textview_first"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="@string/lorem_ipsum"
-            app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/button_first" />
-    </androidx.constraintlayout.widget.ConstraintLayout>
-</androidx.core.widget.NestedScrollView>
+            android:text="后端地址"
+            android:textStyle="bold" />
+
+        <EditText
+            android:id="@+id/edit_base_url"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="https://django-ifdx-26475-5-1316545348.sh.run.tcloudbase.com"
+            android:inputType="textUri" />
+
+        <Button
+            android:id="@+id/button_save_url"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="保存地址" />
+
+        <TextView
+            android:id="@+id/text_bind_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="未绑定" />
+
+        <EditText
+            android:id="@+id/edit_bind_code"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="输入小程序绑定码"
+            android:inputType="text" />
+
+        <Button
+            android:id="@+id/button_bind"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="绑定账号" />
+
+        <Button
+            android:id="@+id/button_open_notification_access"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="开启通知访问权限" />
+
+        <Switch
+            android:id="@+id/switch_capture"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="后台自动捕捉通知" />
+
+        <Button
+            android:id="@+id/button_capture_now"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="抓取当前通知" />
+
+        <Button
+            android:id="@+id/button_post_test_notification"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="模拟发送通知（本机）" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="日志"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/text_log"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:background="#F2F2F2"
+            android:minHeight="120dp"
+            android:padding="10dp"
+            android:textColor="#333333" />
+    </LinearLayout>
+
+</ScrollView>

@@ -64,7 +64,7 @@ class JoinRequest(BaseModel):
 class CreateEventRequest(BaseModel):
     title: str
     start_time: str       # ISO 8601: "2025-03-15 09:00:00"
-    end_time: str
+    end_time: Optional[str] = None
     location: Optional[str] = ""
     content: Optional[str] = ""
 
@@ -114,3 +114,69 @@ class Notification(BaseModel):
     ref_event_id: Optional[int]
     ref_cal_id: Optional[int]
     created_at: datetime
+
+
+# ── App 绑定 / 捕获通知 / 批量创建 ──────────────────────────
+
+class CreateBindCodeResponse(BaseModel):
+    bind_code: str
+    expires_at: datetime
+
+
+class AppBindRequest(BaseModel):
+    bind_code: str
+    device_id: str = "unknown"
+
+
+class AppBindResponse(BaseModel):
+    app_token: str
+    user_id: int
+
+
+class AndroidIngestNotificationRequest(BaseModel):
+    package_name: str
+    title: str = ""
+    text: str = ""
+    posted_at: str
+    dedupe_key: str
+
+
+class CapturedNotification(BaseModel):
+    id: int
+    user_id: int
+    package_name: str
+    title: str
+    text: str
+    posted_at: str
+    received_at: datetime
+    dedupe_key: str
+    status: str
+    suggested_start_time: Optional[str] = None
+    suggested_end_time: Optional[str] = None
+
+
+class BatchCreateEventsRequest(BaseModel):
+    calendar_ids: list[int]
+    title: str
+    start_time: str
+    end_time: Optional[str] = None
+    location: Optional[str] = ""
+    content: Optional[str] = ""
+
+
+class BatchCreateEventResult(BaseModel):
+    calendar_id: int
+    calendar_name: str
+    ok: bool
+    event_id: Optional[int] = None
+    error: Optional[str] = None
+
+
+class BatchCreateEventsResponse(BaseModel):
+    all_ok: bool
+    results: list[BatchCreateEventResult]
+
+
+class CreateEventsFromCapturedResponse(BaseModel):
+    all_ok: bool
+    results: list[BatchCreateEventResult]

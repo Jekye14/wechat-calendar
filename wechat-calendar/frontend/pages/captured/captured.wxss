@@ -1,0 +1,24 @@
+.page { padding: 24rpx; min-height: 100vh; background: #f5f5f5; }
+.empty { text-align: center; color: #999; margin-top: 120rpx; font-size: 28rpx; }
+.list { display: flex; flex-direction: column; gap: 20rpx; }
+.card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 20rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.06);
+}
+.title { font-size: 32rpx; font-weight: 600; color: #222; margin-bottom: 8rpx; }
+.meta { font-size: 24rpx; color: #888; margin-bottom: 6rpx; }
+.text { font-size: 26rpx; color: #555; margin-top: 12rpx; white-space: pre-wrap; }
+.actions { margin-top: 16rpx; display: flex; gap: 12rpx; }
+.btn {
+  flex: 1;
+  height: 72rpx;
+  border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+}
+.btn.primary { background: #4A90D9; color: #fff; }
+.btn.danger { background: #fbe9e7; color: #d84315; }

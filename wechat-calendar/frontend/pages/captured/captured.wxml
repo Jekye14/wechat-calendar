@@ -1,0 +1,17 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="empty">加载中...</view>
+  <view wx:elif="{{list.length===0}}" class="empty">暂无待处理捕获通知</view>
+  <view wx:else class="list">
+    <view class="card" wx:for="{{list}}" wx:key="id">
+      <view class="title">{{item.title || '未命名通知'}}</view>
+      <view class="meta">来源：{{item.package_name}}</view>
+      <view class="meta">收到时间：{{item.received_at}}</view>
+      <view wx:if="{{item.suggested_start_time}}" class="meta">建议时间：{{item.suggested_start_time}} ~ {{item.suggested_end_time}}</view>
+      <view class="text">{{item.text}}</view>
+      <view class="actions">
+        <view class="btn primary" bindtap="createFromCaptured" data-id="{{item.id}}">创建日程</view>
+        <view class="btn danger" bindtap="dismissItem" data-id="{{item.id}}">忽略</view>
+      </view>
+    </view>
+  </view>
+</view>
