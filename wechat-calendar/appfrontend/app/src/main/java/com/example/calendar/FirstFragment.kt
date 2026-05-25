@@ -10,6 +10,12 @@ import android.view.ViewGroup
 import com.example.calendar.databinding.FragmentFirstBinding
 import kotlin.concurrent.thread
 
+import android.app.AlertDialog
+import android.content.ComponentName
+import android.content.Context
+import android.os.Build
+import android.text.TextUtils
+
 /**
  * 通知捕获 MVP 页面
  */
@@ -68,13 +74,24 @@ class FirstFragment : Fragment() {
         }
 
         binding.switchCapture.setOnCheckedChangeListener { _, checked ->
+            if (checked) {
+                val ok = ensureNotificationAccessOrPrompt()
+                if (!ok) {
+                    // 用户未授权：把开关拨回去，避免误以为已开启
+                    binding.switchCapture.isChecked = false
+                    AppPrefs.setCaptureEnabled(ctx, false)
+                    appendLog("❌ 未开启通知使用权限，无法后台捕捉")
+                    return@setOnCheckedChangeListener
+                }
+            }
+
             AppPrefs.setCaptureEnabled(ctx, checked)
             appendLog(if (checked) "已开启后台捕获" else "已关闭后台捕获")
         }
 
-        binding.buttonOpenNotificationAccess.setOnClickListener {
-            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-        }
+//        binding.buttonOpenNotificationAccess.setOnClickListener {
+//            startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+//        }
 
 //        binding.buttonPostTestNotification.setOnClickListener {
 //            // Android 13+ 可能需要通知权限；如果你点了没出现通知，去系统设置给本 App 开通知权限
@@ -87,13 +104,47 @@ class FirstFragment : Fragment() {
 //        }
 
         binding.buttonCaptureNow.setOnClickListener {
-            val ok = NotificationCaptureService.captureCurrentNotifications()
-            if (!ok) appendLog("监听服务未连接，请先开启通知访问并重新打开 App")
-        }
+            val okAccess = ensureNotificationAccessOrPrompt()
+            if (!okAccess) {
+                appendLog("❌ 未开启通知使用权限，无法抓取当前通知")
+                return@setOnClickListener
+            }
 
-        NotificationCaptureService.onUploadLog = { msg ->
-            activity?.runOnUiThread { appendLog(msg) }
+            val ok = NotificationCaptureService.captureCurrentNotifications()
+            if (!ok) {
+                appendLog("已授权通知使用权限，但监听服务未连接：请重新打开 App，或到系统设置里关闭再开启通知使用权")
+            }
         }
+    }
+    private fun isNotificationListenerEnabled(ctx: Context): Boolean {
+        val pkgName = ctx.packageName
+        val flat = Settings.Secure.getString(ctx.contentResolver, "enabled_notification_listeners")
+            ?: return false
+        // enabled_notification_listeners 内容类似：com.xxx/.NotificationCaptureService:...
+        return flat.contains(pkgName)
+    }
+
+    private fun showNeedNotificationAccessDialog() {
+        val ctx = requireContext()
+        AlertDialog.Builder(ctx)
+            .setTitle("需要通知访问权限")
+            .setMessage("要自动捕获通知，请在系统设置中为本应用开启「通知使用权」。")
+            .setNegativeButton("取消", null)
+            .setPositiveButton("去授权") { _, _ ->
+                // 跳转到系统“通知使用权”设置页
+                startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            }
+            .show()
+    }
+
+    /**
+     * 确保已授权通知使用权；未授权则弹窗并返回 false
+     */
+    private fun ensureNotificationAccessOrPrompt(): Boolean {
+        val ctx = requireContext()
+        if (isNotificationListenerEnabled(ctx)) return true
+        showNeedNotificationAccessDialog()
+        return false
     }
 
     private fun appendLog(msg: String) {

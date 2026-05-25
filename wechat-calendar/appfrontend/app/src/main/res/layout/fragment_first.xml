@@ -33,7 +33,7 @@
                 <ImageView
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
-                    android:src="@mipmap/APP_icon"
+                    android:src="@mipmap/appicon"
                     android:scaleType="centerCrop"/>  <!-- 图片自适应填充 -->
 
             </androidx.cardview.widget.CardView>
