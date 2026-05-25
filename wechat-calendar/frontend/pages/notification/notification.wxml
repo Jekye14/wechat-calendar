@@ -1,6 +1,6 @@
 <!-- pages/notification/notification.wxml -->
 <view class="page">
-  <view class="nav-title">通知中心</view>
+  <view class="nav-title">审批通知</view>
   <view wx:if="{{loading}}" class="empty">加载中...</view>
   <view wx:elif="{{notifications.length===0}}" class="empty">
     <text>暂无通知</text>

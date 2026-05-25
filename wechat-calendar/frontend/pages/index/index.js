@@ -161,7 +161,7 @@ Page({
         data: code,
         success: () => {
           wx.showModal({
-            title: '绑定码已生成（已复制）',
+            title: '绑定码已生成（有效期10分钟）',
             content: `bind_code: ${code}\nexpires_at: ${expiresAt || ''}`,
             showCancel: false
           })
