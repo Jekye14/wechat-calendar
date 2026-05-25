@@ -7,9 +7,23 @@
 .field { padding: 24rpx 0; }
 .label { font-size: 28rpx; color: #333; font-weight: 500; display: block; margin-bottom: 16rpx; }
 .label.required::after { content: ' *'; color: #E53935; }
-.input {
+/* .input {
   font-size: 28rpx; color: #222; background: #f8f8f8;
   border-radius: 10rpx; padding: 16rpx 20rpx; width: 100%; box-sizing: border-box;
+} */
+.input {
+    font-size: 28rpx;
+    color: #222;
+    background: #f8f8f8;
+    border-radius: 10rpx;
+  
+    /* 关键：固定高度 + 行高，让 placeholder 垂直居中 */
+    height: 80rpx;
+    line-height: 80rpx;
+  
+    padding: 0 20rpx;
+    width: 100%;
+    box-sizing: border-box;
 }
 .textarea {
   font-size: 28rpx; color: #222; background: #f8f8f8;

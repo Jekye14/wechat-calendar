@@ -64,27 +64,31 @@
             <text class="ev-time">{{item.startLabel}}-{{item.endLabel}}</text>
           </view>
         </view>
-
+        <!-- 底部占位：避免内容被 fixed 的 bottom-bar 挡住 -->
+        <view class="bottom-spacer"></view>
       </view>
     </scroll-view>
 
-    <!-- 图例 -->
-    <view class="legend">
-      <view class="legend-item" wx:if="{{calendar}}">
-        <view class="legend-dot" style="background:#4A90D9"></view>
-        <text>创建者</text>
-      </view>
-      <view class="legend-item" wx:for="{{members}}" wx:key="id">
-        <view class="legend-dot" style="background:{{colorMap[item.id]}}"></view>
-        <text>{{item.nick_name}}</text>
-      </view>
-    </view>
+    <!-- 底部固定区：图例 + 操作按钮 -->
+    <view class="bottom-bar">
+        <!-- 图例 -->
+        <view class="legend">
+            <view class="legend-item" wx:if="{{calendar}}">
+            <view class="legend-dot" style="background:#4A90D9"></view>
+            <text>创建者</text>
+            </view>
+            <view class="legend-item" wx:for="{{members}}" wx:key="id">
+            <view class="legend-dot" style="background:{{colorMap[item.id]}}"></view>
+            <text>{{item.nick_name}}</text>
+            </view>
+        </view>
 
-    <!-- 操作按钮 -->
-    <view class="action-bar">
-      <view class="action-btn primary"  bindtap="goCreateEvent">+ 创建事件</view>
-      <view wx:if="{{isCreator}}" class="action-btn assigned" bindtap="goCreateAssigned">+ 指派事件</view>
-      <view wx:if="{{isCreator}}" class="action-btn share"    bindtap="shareInvite">分享邀请</view>
+        <!-- 操作按钮 -->
+        <view class="action-bar">
+            <view class="action-btn primary"  bindtap="goCreateEvent">+ 创建事件</view>
+            <view wx:if="{{isCreator}}" class="action-btn assigned" bindtap="goCreateAssigned">+ 指派事件</view>
+            <view wx:if="{{isCreator}}" class="action-btn share"    bindtap="shareInvite">分享邀请</view>
+        </view>
     </view>
 
   </block>

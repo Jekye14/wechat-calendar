@@ -43,9 +43,15 @@
 .day-num.today-num { background: #4A90D9; color: #fff; }
 
 /* ── 滚动区 ── */
-.grid-scroll { flex: 1; height: calc(100vh - 280rpx); }
+/* .grid-scroll { flex: 1; height: calc(100vh - 280rpx); } */
+.grid-scroll { 
+    flex: 1; 
+  }
 .grid-body { display: flex; position: relative; }
-
+/* 给 scroll-view 预留空间，防止被底部 fixed 栏遮挡 */
+.bottom-spacer {
+    height: 260rpx; /* 经验值：legend + action-bar + padding */
+  }
 /* 左侧时间刻度 */
 .time-gutter { width: 80rpx; flex-shrink: 0; }
 .hour-cell {
@@ -96,7 +102,20 @@
 .ev-time {
   display: block; font-size: 18rpx; color: rgba(255,255,255,0.85);
 }
-
+/* 底部固定区（图例+按钮） */
+.bottom-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+  
+    background: #fff;
+    border-top: 1rpx solid #eee;
+    z-index: 50;
+  
+    /* 适配 iPhone 底部安全区（微信小程序支持 env()） */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 /* ── 图例 ── */
 .legend {
   display: flex; flex-wrap: wrap; gap: 16rpx;
