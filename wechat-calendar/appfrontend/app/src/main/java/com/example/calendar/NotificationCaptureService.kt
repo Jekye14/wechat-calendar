@@ -51,7 +51,7 @@ class NotificationCaptureService : NotificationListenerService() {
     }
     // 处理通知内容并上传到服务器
     private fun processAndUpload(sbn: StatusBarNotification) {
-//        if (!whitelist.contains(sbn.packageName)) return // 只处理白名单内的应用
+        if (!whitelist.contains(sbn.packageName)) return // 只处理白名单内的应用
         val token = AppPrefs.getAppToken(this)
         if (token.isBlank()) return
 
