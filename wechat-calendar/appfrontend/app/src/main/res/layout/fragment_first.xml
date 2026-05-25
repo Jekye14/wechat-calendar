@@ -1,92 +1,181 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#F5F5F5"
     android:padding="16dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical">
+        android:orientation="vertical"
+        android:gap="16dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="后端地址"
-            android:textStyle="bold" />
-
-        <EditText
-            android:id="@+id/edit_base_url"
+        <!-- ====================== 顶部：APP名称 + 图标 ====================== -->
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="https://django-ifdx-26475-5-1316545348.sh.run.tcloudbase.com"
-            android:inputType="textUri" />
+            android:gravity="center"
+            android:orientation="horizontal"
+            android:paddingVertical="12dp"
+            android:gap="12dp">
 
-        <Button
-            android:id="@+id/button_save_url"
+            <!-- 圆角矩形 APP 图标 -->
+            <androidx.cardview.widget.CardView
+                android:layout_width="36dp"
+                android:layout_height="36dp"
+                app:cardCornerRadius="8dp"
+                app:cardElevation="0dp"
+                app:cardUseCompatPadding="false">
+
+                <ImageView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:src="@mipmap/APP_icon"
+                    android:scaleType="centerCrop"/>  <!-- 图片自适应填充 -->
+
+            </androidx.cardview.widget.CardView>
+
+            <!-- APP名称：科研日程 -->
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="科研日程"
+                android:textColor="#212121"
+                android:textSize="26sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <!-- 1. 绑定账号模块（卡片式） -->
+        <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="保存地址" />
+            android:elevation="2dp"
+            app:cardCornerRadius="12dp"
+            app:cardUseCompatPadding="true">
 
-        <TextView
-            android:id="@+id/text_bind_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="未绑定" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:gap="12dp">
 
-        <EditText
-            android:id="@+id/edit_bind_code"
+                <TextView
+                    android:id="@+id/text_bind_status"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="未绑定"
+                    android:textColor="#F44336"
+                    android:textSize="16sp"
+                    android:textStyle="medium" />
+
+                <EditText
+                    android:id="@+id/edit_bind_code"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/edittext_bg"
+                    android:hint="输入小程序绑定码"
+                    android:inputType="text"
+                    android:padding="12dp"
+                    android:textSize="14sp"
+                    android:maxLines="1"
+                    android:hintTextColor="#9E9E9E" />
+
+                <Button
+                    android:id="@+id/button_bind"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:backgroundTint="#2196F3"
+                    android:text="绑定账号"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:stateListAnimator="@null"
+                    android:cornerRadius="8dp" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- 2. 通知捕捉模块（卡片式） -->
+        <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="输入小程序绑定码"
-            android:inputType="text" />
+            android:elevation="2dp"
+            app:cardCornerRadius="12dp"
+            app:cardUseCompatPadding="true">
 
-        <Button
-            android:id="@+id/button_bind"
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:gap="16dp">
+
+                <Switch
+                    android:id="@+id/switch_capture"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="后台自动捕捉通知"
+                    android:textSize="16sp"
+                    android:textColor="#212121"
+                    android:thumbTint="#2196F3"
+                    android:trackTint="#E0E0E0"
+                    android:paddingVertical="4dp" />
+
+                <Button
+                    android:id="@+id/button_capture_now"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:backgroundTint="#2196F3"
+                    android:text="抓取当前通知"
+                    android:textColor="#FFFFFF"
+                    android:textSize="16sp"
+                    android:stateListAnimator="@null"
+                    android:cornerRadius="8dp" />
+
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
+
+        <!-- 3. 日志展示模块 -->
+        <androidx.cardview.widget.CardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="绑定账号" />
+            android:elevation="2dp"
+            app:cardCornerRadius="12dp"
+            app:cardUseCompatPadding="true">
 
-        <Button
-            android:id="@+id/button_open_notification_access"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="开启通知访问权限" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
 
-        <Switch
-            android:id="@+id/switch_capture"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="后台自动捕捉通知" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="日志"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="#212121"
+                    android:marginBottom="12dp" />
 
-        <Button
-            android:id="@+id/button_capture_now"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="抓取当前通知" />
+                <TextView
+                    android:id="@+id/text_log"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="#F2F2F2"
+                    android:minHeight="180dp"
+                    android:padding="16dp"
+                    android:textColor="#333333"
+                    android:textSize="14sp"
+                    android:lineSpacingMultiplier="1.2"
+                    android:gravity="start|top"
+                    tools:text="日志示例：\n1. 2024-05-20 10:00:00 - 开始监听通知\n2. 2024-05-20 10:05:00 - 未检测到新通知" />
 
-        <Button
-            android:id="@+id/button_post_test_notification"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="模拟发送通知（本机）" />
+            </LinearLayout>
+        </androidx.cardview.widget.CardView>
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="日志"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/text_log"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="#F2F2F2"
-            android:minHeight="120dp"
-            android:padding="10dp"
-            android:textColor="#333333" />
     </LinearLayout>
-
 </ScrollView>

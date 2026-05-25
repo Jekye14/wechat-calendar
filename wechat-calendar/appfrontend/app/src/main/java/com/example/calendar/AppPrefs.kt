@@ -9,7 +9,7 @@ object AppPrefs {
     private const val KEY_APP_TOKEN = "app_token"
     private const val KEY_CAPTURE_ENABLED = "capture_enabled"
     private const val KEY_DEDUPE_SET = "dedupe_set"
-    private const val DEFAULT_BASE_URL = "http://10.0.2.2:8000"
+    private const val DEFAULT_BASE_URL = "https://django-ifdx-26475-5-1316545348.sh.run.tcloudbase.com"
     private const val MAX_DEDUPE = 200
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)

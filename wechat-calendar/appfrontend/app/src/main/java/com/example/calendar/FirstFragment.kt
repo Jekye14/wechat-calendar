@@ -35,15 +35,15 @@ class FirstFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         val ctx = requireContext()
 
-        binding.editBaseUrl.setText(AppPrefs.getBaseUrl(ctx))
+//        binding.editBaseUrl.setText(AppPrefs.getBaseUrl(ctx))
         binding.switchCapture.isChecked = AppPrefs.isCaptureEnabled(ctx)
         val hasToken = AppPrefs.getAppToken(ctx).isNotBlank()
         binding.textBindStatus.text = if (hasToken) "已绑定 App Token" else "未绑定"
 
-        binding.buttonSaveUrl.setOnClickListener {
-            AppPrefs.setBaseUrl(ctx, binding.editBaseUrl.text?.toString() ?: "")
-            appendLog("已保存后端地址")
-        }
+//        binding.buttonSaveUrl.setOnClickListener {
+//            AppPrefs.setBaseUrl(ctx, binding.editBaseUrl.text?.toString() ?: "")
+//            appendLog("已保存后端地址")
+//        }
 
         binding.buttonBind.setOnClickListener {
             val bindCode = binding.editBindCode.text?.toString()?.trim().orEmpty()
@@ -76,15 +76,15 @@ class FirstFragment : Fragment() {
             startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
         }
 
-        binding.buttonPostTestNotification.setOnClickListener {
-            // Android 13+ 可能需要通知权限；如果你点了没出现通知，去系统设置给本 App 开通知权限
-            DebugNotification.post(
-                ctx,
-                title = "测试通知标题",
-                text = "测试通知正文：05-22 15:30 开会（用于捕获与时间提取）"
-            )
-            appendLog("已发送本机测试通知（请下拉通知栏确认）")
-        }
+//        binding.buttonPostTestNotification.setOnClickListener {
+//            // Android 13+ 可能需要通知权限；如果你点了没出现通知，去系统设置给本 App 开通知权限
+//            DebugNotification.post(
+//                ctx,
+//                title = "测试通知标题",
+//                text = "测试通知正文：05-22 15:30 开会（用于捕获与时间提取）"
+//            )
+//            appendLog("已发送本机测试通知（请下拉通知栏确认）")
+//        }
 
         binding.buttonCaptureNow.setOnClickListener {
             val ok = NotificationCaptureService.captureCurrentNotifications()
