@@ -44,10 +44,12 @@
 
 /* ── 滚动区 ── */
 /* .grid-scroll { flex: 1; height: calc(100vh - 280rpx); } */
+/* .grid-body { display: flex; position: relative; } */
 .grid-scroll { 
     flex: 1; 
   }
-.grid-body { display: flex; position: relative; }
+.grid-body { display: flex; flex-direction: column; position: relative; }
+.grid-row { display: flex; }
 /* 给 scroll-view 预留空间，防止被底部 fixed 栏遮挡 */
 .bottom-spacer {
     height: 260rpx; /* 经验值：legend + action-bar + padding */

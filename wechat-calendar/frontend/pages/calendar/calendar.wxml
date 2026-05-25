@@ -31,64 +31,69 @@
 
     <!-- 滚动区：时间轴 + 事件格 -->
     <scroll-view class="grid-scroll" scroll-y scroll-with-animation>
+      <!-- 注意：grid-body 需要在 wxss 里改为 column，bottom-spacer 才会在纵向生效 -->
       <view class="grid-body">
 
-        <!-- 左侧时间刻度 -->
-        <view class="time-gutter">
-          <view class="hour-cell" wx:for="{{hourLabels}}" wx:key="*this">
-            <text class="hour-label">{{item}}</text>
+        <!-- 横向主体：左侧时间刻度 + 主体网格 -->
+        <view class="grid-row">
+
+          <!-- 左侧时间刻度 -->
+          <view class="time-gutter">
+            <view class="hour-cell" wx:for="{{hourLabels}}" wx:key="*this">
+              <text class="hour-label">{{item}}</text>
+            </view>
           </view>
+
+          <!-- 主体：7列背景线 + 事件块绝对定位 -->
+          <view class="grid-main">
+            <!-- 背景：24行横线 -->
+            <view class="bg-lines">
+              <view class="hour-line" wx:for="{{hourLabels}}" wx:key="*this"></view>
+            </view>
+
+            <!-- 7列竖分割线 -->
+            <view class="col-lines">
+              <view class="col-line" wx:for="{{weekDays}}" wx:key="dateStr"></view>
+            </view>
+
+            <!-- 事件块（绝对定位） -->
+            <view
+              wx:for="{{eventBlocks}}" wx:key="id"
+              class="event-block {{item.status=='pending'?'ev-pending':''}} {{item.event_type=='assigned'?'ev-assigned':''}}"
+              style="{{item.style}}"
+              bindtap="openEvent"
+              data-id="{{item.id}}"
+            >
+              <text class="ev-title">{{item.title}}</text>
+              <text class="ev-time">{{item.startLabel}}-{{item.endLabel}}</text>
+            </view>
+          </view>
+
         </view>
 
-        <!-- 主体：7列背景线 + 事件块绝对定位 -->
-        <view class="grid-main">
-          <!-- 背景：24行横线 -->
-          <view class="bg-lines">
-            <view class="hour-line" wx:for="{{hourLabels}}" wx:key="*this"></view>
-          </view>
-
-          <!-- 7列竖分割线 -->
-          <view class="col-lines">
-            <view class="col-line" wx:for="{{weekDays}}" wx:key="dateStr"></view>
-          </view>
-
-          <!-- 事件块（绝对定位） -->
-          <view
-            wx:for="{{eventBlocks}}" wx:key="id"
-            class="event-block {{item.status=='pending'?'ev-pending':''}} {{item.event_type=='assigned'?'ev-assigned':''}}"
-            style="{{item.style}}"
-            bindtap="openEvent"
-            data-id="{{item.id}}"
-          >
-            <text class="ev-title">{{item.title}}</text>
-            <text class="ev-time">{{item.startLabel}}-{{item.endLabel}}</text>
-          </view>
-        </view>
-        <!-- 底部占位：避免内容被 fixed 的 bottom-bar 挡住 -->
+        <!-- 底部占位：避免被 legend/action-bar 或 fixed 底栏遮挡（高度在 wxss 配） -->
         <view class="bottom-spacer"></view>
+
       </view>
     </scroll-view>
 
-    <!-- 底部固定区：图例 + 操作按钮 -->
-    <view class="bottom-bar">
-        <!-- 图例 -->
-        <view class="legend">
-            <view class="legend-item" wx:if="{{calendar}}">
-            <view class="legend-dot" style="background:#4A90D9"></view>
-            <text>创建者</text>
-            </view>
-            <view class="legend-item" wx:for="{{members}}" wx:key="id">
-            <view class="legend-dot" style="background:{{colorMap[item.id]}}"></view>
-            <text>{{item.nick_name}}</text>
-            </view>
-        </view>
+    <!-- 图例 -->
+    <view class="legend">
+      <view class="legend-item" wx:if="{{calendar}}">
+        <view class="legend-dot" style="background:#4A90D9"></view>
+        <text>创建者</text>
+      </view>
+      <view class="legend-item" wx:for="{{members}}" wx:key="id">
+        <view class="legend-dot" style="background:{{colorMap[item.id]}}"></view>
+        <text>{{item.nick_name}}</text>
+      </view>
+    </view>
 
-        <!-- 操作按钮 -->
-        <view class="action-bar">
-            <view class="action-btn primary"  bindtap="goCreateEvent">+ 创建事件</view>
-            <view wx:if="{{isCreator}}" class="action-btn assigned" bindtap="goCreateAssigned">+ 指派事件</view>
-            <view wx:if="{{isCreator}}" class="action-btn share"    bindtap="shareInvite">分享邀请</view>
-        </view>
+    <!-- 操作按钮 -->
+    <view class="action-bar">
+      <view class="action-btn primary"  bindtap="goCreateEvent">+ 创建事件</view>
+      <view wx:if="{{isCreator}}" class="action-btn assigned" bindtap="goCreateAssigned">+ 指派事件</view>
+      <view wx:if="{{isCreator}}" class="action-btn share"    bindtap="shareInvite">分享邀请</view>
     </view>
 
   </block>
