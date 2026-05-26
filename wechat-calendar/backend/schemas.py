@@ -116,6 +116,19 @@ class Notification(BaseModel):
     created_at: datetime
 
 
+class SubscribeConfigResponse(BaseModel):
+    approval_result_template_id: str = ""
+    schedule_update_template_id: str = ""
+
+
+class SubscribeReportRequest(BaseModel):
+    result: dict[str, str]
+
+
+class SubscribeStatusResponse(BaseModel):
+    status: dict[str, str]
+
+
 # ── App 绑定 / 捕获通知 / 批量创建 ──────────────────────────
 
 class CreateBindCodeResponse(BaseModel):

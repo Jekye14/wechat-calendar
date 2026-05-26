@@ -10,6 +10,7 @@
 - 本文件保持原有函数签名，供 main.py 直接调用
 - 启动时 init_db() 自动建表（幂等）
 """
+import json
 import os
 from typing import Optional, Any
 from datetime import datetime
@@ -159,6 +160,18 @@ def init_db():
                 CONSTRAINT fk_notif_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 INDEX idx_notifications_user_created (user_id, created_at),
                 INDEX idx_notifications_user_read (user_id, is_read)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """)
+
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS wx_subscribe_prefs (
+                user_id BIGINT NOT NULL,
+                template_id VARCHAR(128) NOT NULL,
+                state VARCHAR(16) NOT NULL,
+                raw_json JSON NULL,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, template_id),
+                CONSTRAINT fk_subscribe_prefs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """)
 
@@ -514,6 +527,31 @@ def get_unread_count(user_id: int) -> int:
             WHERE user_id=%s AND is_read=0
         """, (user_id,))
         return int(row["cnt"]) if row else 0
+
+
+def upsert_subscribe_pref(user_id: int, template_id: str, state: str, raw_json):
+    raw_payload = json.dumps(raw_json, ensure_ascii=False) if raw_json is not None else None
+    with get_conn() as conn:
+        _execute(conn, """
+            INSERT INTO wx_subscribe_prefs
+                (user_id, template_id, state, raw_json)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                state=VALUES(state),
+                raw_json=VALUES(raw_json),
+                updated_at=CURRENT_TIMESTAMP
+        """, (user_id, template_id, state, raw_payload))
+        conn.commit()
+
+
+def get_subscribe_prefs(user_id: int) -> dict[str, str]:
+    with get_conn() as conn:
+        rows = _fetchall(conn, """
+            SELECT template_id, state
+            FROM wx_subscribe_prefs
+            WHERE user_id=%s
+        """, (user_id,))
+        return {row["template_id"]: row["state"] for row in rows or []}
 
 
 # ── App 绑定/令牌 ─────────────────────────────────────────────

@@ -3,6 +3,41 @@
   background: #4A90D9; color: #fff; font-size: 36rpx; font-weight: 700;
   padding: 32rpx 24rpx 24rpx; text-align: center;
 }
+.subscribe-card {
+  margin: 16rpx;
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  box-shadow: 0 2rpx 12rpx rgba(0,0,0,0.06);
+}
+.subscribe-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+.subscribe-title { font-size: 30rpx; font-weight: 600; color: #222; }
+.subscribe-status {
+  font-size: 24rpx;
+  padding: 8rpx 18rpx;
+  border-radius: 999rpx;
+}
+.status-on { background: #E8F5E9; color: #2E7D32; }
+.status-off { background: #ECEFF1; color: #607D8B; }
+.status-warn { background: #FFF3E0; color: #EF6C00; }
+.subscribe-desc {
+  margin-top: 12rpx;
+  font-size: 26rpx;
+  color: #666;
+  line-height: 1.5;
+}
+.subscribe-btn {
+  margin-top: 20rpx;
+  background: #4A90D9;
+  color: #fff;
+  border-radius: 12rpx;
+  font-size: 28rpx;
+}
 .notif-list { padding: 16rpx; }
 .notif-item {
   display: flex; align-items: flex-start;

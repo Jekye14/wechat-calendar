@@ -1,5 +1,5 @@
 """
-微信日历小程序后端 - FastAPI + SQLite
+微信日历小程序后端 - FastAPI + MySQL
 安装: pip install fastapi uvicorn python-jose[cryptography] httpx
 运行: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 """
@@ -71,6 +71,85 @@ def normalize_end_time(start_time: str, end_time: str | None) -> str:
     return (start_dt + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
 
 
+def get_subscribe_config() -> dict:
+    return {
+        "approval_result_template_id": (os.environ.get("WX_TMPL_APPROVAL_RESULT") or "").strip(),
+        "schedule_update_template_id": (os.environ.get("WX_TMPL_SCHEDULE_UPDATE") or "").strip(),
+    }
+
+
+def shorten_text(value: str | None, limit: int = 20, default: str = "") -> str:
+    text = (value or default or "").strip()
+    if len(text) <= limit:
+        return text
+    return text[: max(limit - 1, 0)] + "…"
+
+
+def format_subscribe_time(time_str: str | None) -> str:
+    if not time_str:
+        return ""
+    try:
+        return parse_datetime_str(time_str).strftime("%Y-%m-%d %H:%M")
+    except HTTPException:
+        return str(time_str)
+
+
+def get_user_openid(user_id: int) -> str | None:
+    target_user = db.get_user_by_id(user_id)
+    if not target_user:
+        return None
+    return target_user.get("openid")
+
+
+def send_subscribe_if_accepted(user_id: int, template_id: str, data: dict, event_id: int):
+    if not template_id:
+        return None
+    prefs = db.get_subscribe_prefs(user_id)
+    if prefs.get(template_id) != "accept":
+        return None
+
+    openid = get_user_openid(user_id)
+    if not openid:
+        logger.warning("skip subscribe message: user %s has no openid", user_id)
+        return None
+
+    return wechat.send_subscribe_message(
+        openid=openid,
+        template_id=template_id,
+        data=data,
+        page=f"pages/event-detail/event-detail?id={event_id}",
+    )
+
+
+def notify_schedule_update_subscribe(target_user_id: int, cal: dict, event: dict, actor_name: str, action: str):
+    template_id = get_subscribe_config()["schedule_update_template_id"]
+    if not template_id:
+        return None
+
+    data = {
+        "thing1": {"value": shorten_text(event.get("title"), 20, "未命名日程")},
+        "time2": {"value": format_subscribe_time(event.get("start_time"))},
+        "thing3": {"value": shorten_text(event.get("location"), 20, "无")},
+        "thing4": {"value": shorten_text(actor_name, 20, "成员")},
+        "thing5": {"value": shorten_text(f"{shorten_text(actor_name, 8, '成员')}{action}，待审批", 20)},
+    }
+    return send_subscribe_if_accepted(target_user_id, template_id, data, event["id"])
+
+
+def notify_approval_result_subscribe(target_user_id: int, cal: dict, event: dict, result_text: str, remark: str):
+    template_id = get_subscribe_config()["approval_result_template_id"]
+    if not template_id:
+        return None
+
+    data = {
+        "phrase2": {"value": result_text},
+        "time3": {"value": datetime.now().strftime("%Y-%m-%d %H:%M")},
+        "thing4": {"value": shorten_text(remark, 20)},
+        "thing5": {"value": shorten_text(cal.get("name"), 20, "未命名日历")},
+    }
+    return send_subscribe_if_accepted(target_user_id, template_id, data, event["id"])
+
+
 def create_single_event_for_calendar(cal_id: int, payload: schemas.BatchCreateEventsRequest, user: dict):
     cal = db.get_calendar(cal_id)
     if not cal:
@@ -113,6 +192,7 @@ def create_single_event_for_calendar(cal_id: int, payload: schemas.BatchCreateEv
             ref_event_id=event["id"],
             ref_cal_id=cal_id,
         )
+        notify_schedule_update_subscribe(cal["creator_id"], cal, event, user["nick_name"], "创建日程")
     return {"calendar_id": cal_id, "calendar_name": cal["name"], "ok": True, "event_id": event["id"]}
 
 # ── 认证 ──────────────────────────────────────────────────────────
@@ -236,6 +316,7 @@ def create_event(cal_id: int, body: schemas.CreateEventRequest, user=Depends(get
             content=f"成员「{user['nick_name']}」在「{cal['name']}」创建了事件「{body.title}」，请审批。",
             ref_event_id=event["id"], ref_cal_id=cal_id,
         )
+        notify_schedule_update_subscribe(cal["creator_id"], cal, event, user["nick_name"], "创建日程")
     return event
 
 @app.get("/calendars/{cal_id}/events", response_model=list[schemas.Event])
@@ -262,6 +343,20 @@ def get_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
     # db.get_event 返回的字段可能不含 creator_name/assignees 等，
     # 但前端事件详情页使用的是 schemas.Event，所以这里用 update_event 返回的完整结构保持一致：
     return db.update_event(event_id, schemas.UpdateEventRequest(), event["status"])
+
+
+@app.get("/events/{event_id}", response_model=schemas.Event)
+def get_event_by_id(event_id: int, user=Depends(get_current_user)):
+    event = db.get_event(event_id)
+    if not event:
+        raise HTTPException(status_code=404, detail="事件不存在")
+
+    cal = db.get_calendar(event["calendar_id"])
+    if not cal:
+        raise HTTPException(status_code=404, detail="日历不存在")
+    if not db.is_member_or_creator(cal["id"], user["id"], cal["creator_id"]):
+        raise HTTPException(status_code=403, detail="无权访问")
+    return event
 # 更新事件
 @app.put("/calendars/{cal_id}/events/{event_id}", response_model=schemas.Event)
 def update_event(cal_id: int, event_id: int, body: schemas.UpdateEventRequest, user=Depends(get_current_user)):
@@ -305,21 +400,18 @@ def update_event(cal_id: int, event_id: int, body: schemas.UpdateEventRequest, u
         for field in comparable_fields
     )
 
-    # 成员改时间 -> 待审批；其余保持原状态
-    changed_time = ("start_time" in incoming and incoming["start_time"] != event["start_time"]) or \
-                   ("end_time" in incoming and incoming["end_time"] != event["end_time"])
-    new_status = "pending" if (not is_creator and changed_time) else event["status"]
+    new_status = "pending" if (not is_creator and has_real_changes) else event["status"]
 
     updated_event = db.update_event(event_id, body, new_status)
 
     if (not is_creator) and has_real_changes:
-        action = "修改了事件时间，待你审批" if changed_time else "更新了事件内容"
         db.create_notification(
             user_id=cal["creator_id"], type="update_request",
             title="事件更新通知",
-            content=f"成员「{user['nick_name']}」{action}：「{updated_event['title']}」",
+            content=f"成员「{user['nick_name']}」修改了事件「{updated_event['title']}」，待你审批。",
             ref_event_id=event_id, ref_cal_id=cal_id,
         )
+        notify_schedule_update_subscribe(cal["creator_id"], cal, updated_event, user["nick_name"], "修改日程")
 
     return updated_event
 
@@ -363,6 +455,7 @@ def delete_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
         content=f"成员「{user['nick_name']}」申请删除「{event['title']}」，请审批。",
         ref_event_id=event_id, ref_cal_id=cal_id,
     )
+    notify_schedule_update_subscribe(cal["creator_id"], cal, event, user["nick_name"], "删除日程")
     return {"ok": True, "message": "删除申请已提交，待创建者审批"}
 
 
@@ -385,6 +478,9 @@ def approve_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
             content=f"你在「{cal['name']}」申请删除的事件「{event['title']}」已通过并删除。",
             ref_event_id=event_id, ref_cal_id=cal_id,
         )
+        notify_approval_result_subscribe(
+            event["creator_id"], cal, event, "审批通过", f"事件{event['title']}删除审批通过"
+        )
         return {"ok": True, "message": "删除申请已通过，事件已删除"}
 
     # 普通待审批通过
@@ -397,6 +493,9 @@ def approve_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
         title="事件已通过审批",
         content=f"你在「{cal['name']}」创建的事件「{event['title']}」已通过审批。",
         ref_event_id=event_id, ref_cal_id=cal_id,
+    )
+    notify_approval_result_subscribe(
+        event["creator_id"], cal, event, "审批通过", f"事件{event['title']}审批成功"
     )
     return {"ok": True, "message": "审批通过"}
 
@@ -422,6 +521,9 @@ def reject_event(cal_id: int, event_id: int, body: schemas.RejectRequest, user=D
             content=f"你在「{cal['name']}」申请删除的事件「{event['title']}」未通过。原因：{reason}",
             ref_event_id=event_id, ref_cal_id=cal_id,
         )
+        notify_approval_result_subscribe(
+            event["creator_id"], cal, event, "审批驳回", f"事件{event['title']}删除审批驳回"
+        )
         return {"ok": True, "message": "删除申请已驳回"}
 
     # 普通审批拒绝
@@ -431,6 +533,9 @@ def reject_event(cal_id: int, event_id: int, body: schemas.RejectRequest, user=D
         title="事件审批未通过",
         content=f"你在「{cal['name']}」创建的事件「{event['title']}」审批未通过。原因：{reason}",
         ref_event_id=event_id, ref_cal_id=cal_id,
+    )
+    notify_approval_result_subscribe(
+        event["creator_id"], cal, event, "审批驳回", f"事件{event['title']}审批失败"
     )
     return {"ok": True, "message": "审批已拒绝"}
 
@@ -470,6 +575,34 @@ def create_assigned_event(cal_id: int, body: schemas.CreateAssignedEventRequest,
     return event
 
 # ── 通知 ──────────────────────────────────────────────────────────
+
+
+@app.get("/subscribe/config", response_model=schemas.SubscribeConfigResponse)
+def get_subscribe_config_route():
+    return get_subscribe_config()
+
+
+@app.get("/subscribe/status", response_model=schemas.SubscribeStatusResponse)
+def get_subscribe_status(user=Depends(get_current_user)):
+    config = get_subscribe_config()
+    prefs = db.get_subscribe_prefs(user["id"])
+    status = {}
+    for template_id in config.values():
+        if template_id:
+            status[template_id] = prefs.get(template_id, "unknown")
+    return {"status": status}
+
+
+@app.post("/subscribe/report")
+def report_subscribe_result(body: schemas.SubscribeReportRequest, user=Depends(get_current_user)):
+    valid_states = {"accept", "reject", "ban"}
+    valid_template_ids = {template_id for template_id in get_subscribe_config().values() if template_id}
+    for template_id, state in (body.result or {}).items():
+        if template_id not in valid_template_ids or state not in valid_states:
+            continue
+        db.upsert_subscribe_pref(user["id"], template_id, state, body.result)
+    return {"ok": True}
+
 
 @app.get("/notifications", response_model=list[schemas.Notification])
 def list_notifications(user=Depends(get_current_user)):

@@ -7,6 +7,8 @@ Page({
     eventId: null,
     event: null,
     calendar: null,
+    loading: true,
+    isDeleted: false,
     isCreator: false,
     isEventOwner: false,
     showRejectModal: false,
@@ -17,26 +19,51 @@ Page({
 
   onLoad(options) {
     this.setData({
-      calId: parseInt(options.calId),
-      eventId: parseInt(options.eventId),
+      calId: options.calId ? parseInt(options.calId, 10) : null,
+      eventId: parseInt(options.eventId || options.id, 10),
     })
     this.load()
   },
 
   load() {
     const { calId, eventId } = this.data
-    Promise.all([
-      app.request({ url: `/calendars/${calId}` }),
-      app.request({ url: `/calendars/${calId}/events/${eventId}` }),
-    ]).then(([cal, ev]) => {
+    this.setData({ loading: true, isDeleted: false })
+
+    const loadPromise = calId
+      ? Promise.all([
+          app.request({ url: `/calendars/${calId}` }),
+          app.request({ url: `/calendars/${calId}/events/${eventId}` }),
+        ]).then(([cal, ev]) => ({ cal, ev }))
+      : app.request({ url: `/events/${eventId}` }).then(ev =>
+          app.request({ url: `/calendars/${ev.calendar_id}` }).then(cal => ({ cal, ev }))
+        )
+
+    loadPromise.then(({ cal, ev }) => {
       const userId = app.globalData.userInfo && app.globalData.userInfo.id
       this.setData({
+        calId: ev.calendar_id,
         calendar: cal,
         event: ev,
+        loading: false,
+        isDeleted: false,
         isCreator: cal.creator_id === userId,
         isEventOwner: ev.creator_id === userId,
       })
       wx.setNavigationBarTitle({ title: ev.title })
+    }).catch((err) => {
+      if (err && err.statusCode === 404) {
+        this.setData({
+          calendar: null,
+          event: null,
+          loading: false,
+          isDeleted: true,
+          isCreator: false,
+          isEventOwner: false,
+        })
+        wx.setNavigationBarTitle({ title: '事件详情' })
+        return
+      }
+      this.setData({ loading: false })
     })
   },
 

@@ -5,6 +5,7 @@
 .status-pending  { background: #FFF3CD; color: #856404; }
 .status-approved { background: #D4EDDA; color: #155724; }
 .status-rejected { background: #F8D7DA; color: #721C24; }
+.status-deleted { background: #ECEFF1; color: #546E7A; }
 .status-assigned { background: #CCE5FF; color: #004085; }
 .card {
   background: #fff; margin: 16rpx; border-radius: 16rpx; padding: 28rpx;

@@ -1,6 +1,16 @@
 <!-- pages/notification/notification.wxml -->
 <view class="page">
   <view class="nav-title">审批通知</view>
+  <view class="subscribe-card">
+    <view class="subscribe-head">
+      <view class="subscribe-title">微信订阅消息</view>
+      <view class="subscribe-status {{subscribeStatusClass}}">{{subscribeStatusText}}</view>
+    </view>
+    <view class="subscribe-desc">开启后可接收审批结果通知和待审批提醒</view>
+    <button class="subscribe-btn" bindtap="requestSubscribe" loading="{{subscribeLoading}}">
+      {{subscribeButtonText}}
+    </button>
+  </view>
   <view wx:if="{{loading}}" class="empty">加载中...</view>
   <view wx:elif="{{notifications.length===0}}" class="empty">
     <text>暂无通知</text>
@@ -10,7 +20,6 @@
       class="notif-item {{item.is_read?'read':'unread'}}"
       wx:for="{{notifications}}" wx:key="id"
       bindtap="goToEvent"
-      data-cal-id="{{item.ref_cal_id}}"
       data-event-id="{{item.ref_event_id}}"
     >
       <view class="notif-icon type-{{item.type}}">

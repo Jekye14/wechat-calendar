@@ -5,12 +5,66 @@ Page({
   data: {
     notifications: [],
     loading: true,
+    subscribeConfig: null,
+    subscribeStatusText: '未开启',
+    subscribeStatusClass: 'status-off',
+    subscribeButtonText: '开启审批通知',
+    subscribeLoading: false,
   },
 
   onLoad() { this.load() },
   onShow() { this.load() },
 
   load() {
+    this.loadSubscribeStatus()
+    this.loadNotifications()
+  },
+
+  loadSubscribeStatus() {
+    return Promise.all([
+      app.request({ url: '/subscribe/config' }),
+      app.request({ url: '/subscribe/status' }),
+    ]).then(([config, statusRes]) => {
+      this.updateSubscribeStatus(config, statusRes.status || {})
+    }).catch(() => {
+      this.setData({
+        subscribeConfig: null,
+        subscribeStatusText: '未开启',
+        subscribeStatusClass: 'status-off',
+        subscribeButtonText: '开启审批通知',
+      })
+    })
+  },
+
+  updateSubscribeStatus(config, statusMap) {
+    const tmplIds = [
+      config && config.approval_result_template_id,
+      config && config.schedule_update_template_id,
+    ].filter(Boolean)
+    const states = tmplIds.map(id => statusMap[id] || 'unknown')
+
+    let subscribeStatusText = '未开启'
+    let subscribeStatusClass = 'status-off'
+    let subscribeButtonText = '开启审批通知'
+    if (tmplIds.length > 0 && states.every(state => state === 'accept')) {
+      subscribeStatusText = '已开启'
+      subscribeStatusClass = 'status-on'
+      subscribeButtonText = '重新授权'
+    } else if (states.some(state => state === 'reject' || state === 'ban')) {
+      subscribeStatusText = '需重新授权'
+      subscribeStatusClass = 'status-warn'
+      subscribeButtonText = '重新授权'
+    }
+
+    this.setData({
+      subscribeConfig: config,
+      subscribeStatusText,
+      subscribeStatusClass,
+      subscribeButtonText,
+    })
+  },
+
+  loadNotifications() {
     this.setData({ loading: true })
     app.request({ url: '/notifications' }).then(data => {
       this.setData({ notifications: data, loading: false })
@@ -19,10 +73,47 @@ Page({
     }).catch(() => this.setData({ loading: false }))
   },
 
+  requestSubscribe() {
+    this.setData({ subscribeLoading: true })
+    app.request({ url: '/subscribe/config' }).then((config) => {
+      const tmplIds = [
+        config.approval_result_template_id,
+        config.schedule_update_template_id,
+      ].filter(Boolean)
+
+      if (!tmplIds.length) {
+        this.setData({ subscribeLoading: false })
+        wx.showToast({ title: '模板未配置', icon: 'none' })
+        return
+      }
+
+      wx.requestSubscribeMessage({
+        tmplIds,
+        success: (res) => {
+          app.request({
+            url: '/subscribe/report',
+            method: 'POST',
+            data: { result: res },
+          }).finally(() => {
+            this.setData({ subscribeLoading: false })
+            this.loadSubscribeStatus()
+            wx.showToast({ title: '授权结果已更新', icon: 'none' })
+          })
+        },
+        fail: () => {
+          this.setData({ subscribeLoading: false })
+          wx.showToast({ title: '订阅授权未完成', icon: 'none' })
+        },
+      })
+    }).catch(() => {
+      this.setData({ subscribeLoading: false })
+    })
+  },
+
   goToEvent(e) {
-    const { calId, eventId } = e.currentTarget.dataset
-    if (calId && eventId) {
-      wx.navigateTo({ url: `/pages/event-detail/event-detail?calId=${calId}&eventId=${eventId}` })
+    const { eventId } = e.currentTarget.dataset
+    if (eventId) {
+      wx.navigateTo({ url: `/pages/event-detail/event-detail?id=${eventId}` })
     }
   },
 
