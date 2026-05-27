@@ -22,10 +22,18 @@ Page({
       calId: options.calId ? parseInt(options.calId, 10) : null,
       eventId: parseInt(options.eventId || options.id, 10),
     })
-    this.load()
+    this.loadEvent()
+  },
+
+  onShow() {
+    if (this.data.eventId) this.loadEvent()
   },
 
   load() {
+    this.loadEvent()
+  },
+
+  loadEvent() {
     const { calId, eventId } = this.data
     this.setData({ loading: true, isDeleted: false })
 
@@ -39,17 +47,21 @@ Page({
         )
 
     loadPromise.then(({ cal, ev }) => {
+      const event = {
+        ...ev,
+        created_at_text: formatDateTime(ev.created_at),
+      }
       const userId = app.globalData.userInfo && app.globalData.userInfo.id
       this.setData({
-        calId: ev.calendar_id,
+        calId: event.calendar_id,
         calendar: cal,
-        event: ev,
+        event,
         loading: false,
         isDeleted: false,
         isCreator: cal.creator_id === userId,
-        isEventOwner: ev.creator_id === userId,
+        isEventOwner: event.creator_id === userId,
       })
-      wx.setNavigationBarTitle({ title: ev.title })
+      wx.setNavigationBarTitle({ title: event.title })
     }).catch((err) => {
       if (err && err.statusCode === 404) {
         this.setData({
@@ -178,9 +190,9 @@ Page({
 })
 
 function formatDateTime(s) {
-    if (!s) return ''
-    return String(s)
-      .replace('T', ' ')
-      .replace(/\.\d{3}.*/, '') // 去掉毫秒及其后内容（如果有）
-      .replace(/Z$/, '')        // 去掉末尾 Z（如果有）
-  }
+  if (!s) return ''
+  return String(s)
+    .replace('T', ' ')
+    .replace(/\.\d+/, '')
+    .replace(/Z$/, '')
+}

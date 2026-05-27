@@ -37,7 +37,7 @@
       <!-- TODO event.created_at为ISO格式，需要转换 -->
       <view class="info-row">
         <text class="icon">🕓</text>
-        <text class="info-val">创建于 {{event.created_at}}</text>
+        <text class="info-val">创建于 {{event.created_at_text}}</text>
       </view>
     </view>
 

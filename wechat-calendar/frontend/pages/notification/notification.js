@@ -67,7 +67,11 @@ Page({
   loadNotifications() {
     this.setData({ loading: true })
     app.request({ url: '/notifications' }).then(data => {
-      this.setData({ notifications: data, loading: false })
+      const notifications = (data || []).map(item => ({
+        ...item,
+        created_at_text: formatDateTime(item.created_at),
+      }))
+      this.setData({ notifications, loading: false })
       // 标记全部已读
       app.request({ url: '/notifications/read-all', method: 'PUT' })
     }).catch(() => this.setData({ loading: false }))
@@ -161,9 +165,9 @@ Page({
 })
 
 function formatDateTime(s) {
-    if (!s) return ''
-    return String(s)
-      .replace('T', ' ')
-      .replace(/\.\d{3}.*/, '') // 去掉毫秒及其后内容（如果有）
-      .replace(/Z$/, '')        // 去掉末尾 Z（如果有）
-  }
+  if (!s) return ''
+  return String(s)
+    .replace('T', ' ')
+    .replace(/\.\d+/, '')
+    .replace(/Z$/, '')
+}
