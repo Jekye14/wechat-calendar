@@ -17,6 +17,12 @@ App({
     wx.cloud.init({
       env: this.globalData.cloudEnv
     })
+    // 2. 为订阅消息创建一个新的实例，用于访问云开发环境
+    this.subscribeCloud = new wx.cloud.Cloud({
+        resourceEnv: 'cloud1-d2gadtxsif7c3d56f', // 这里换成上一步找到的云开发环境ID
+    });
+    // 实例创建后必须调用 init 方法
+    this.subscribeCloud.init();
 
     const openid = wx.getStorageSync('openid')
     const userInfo = wx.getStorageSync('userInfo')

@@ -10,7 +10,11 @@ __pycache__/
 # IDE
 .idea/
 
+# cloud functions
+cloudfunctions/**/node_modules/
+
 其他日历.docx
 AppSecret.txt
 科研日程体验版*.png
 小程序码.png
+
