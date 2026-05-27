@@ -3,8 +3,9 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Install CA certificates so httpx/openssl can verify HTTPS (e.g. api.weixin.qq.com)
+
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates curl openssl \
     && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
