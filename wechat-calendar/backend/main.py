@@ -13,7 +13,6 @@ from contextlib import asynccontextmanager
 import database as db
 import schemas
 import auth
-import wechat
 import time_extract
 import os
 import logging
@@ -101,7 +100,7 @@ def get_user_openid(user_id: int) -> str | None:
     return target_user.get("openid")
 
 
-def send_subscribe_if_accepted(user_id: int, template_id: str, data: dict, event_id: int):
+def build_subscribe_payload_if_accepted(user_id: int, template_id: str, data: dict, event_id: int):
     if not template_id:
         return None
     prefs = db.get_subscribe_prefs(user_id)
@@ -113,12 +112,12 @@ def send_subscribe_if_accepted(user_id: int, template_id: str, data: dict, event
         logger.warning("skip subscribe message: user %s has no openid", user_id)
         return None
 
-    return wechat.send_subscribe_message(
-        openid=openid,
-        template_id=template_id,
-        data=data,
-        page=f"pages/event-detail/event-detail?id={event_id}",
-    )
+    return {
+        "openid": openid,
+        "template_id": template_id,
+        "page": f"pages/event-detail/event-detail?id={event_id}",
+        "data": data,
+    }
 
 
 def notify_schedule_update_subscribe(target_user_id: int, cal: dict, event: dict, actor_name: str, action: str):
@@ -133,7 +132,7 @@ def notify_schedule_update_subscribe(target_user_id: int, cal: dict, event: dict
         "thing4": {"value": shorten_text(actor_name, 20, "成员")},
         "thing5": {"value": shorten_text(f"{shorten_text(actor_name, 8, '成员')}{action}，待审批", 20)},
     }
-    return send_subscribe_if_accepted(target_user_id, template_id, data, event["id"])
+    return build_subscribe_payload_if_accepted(target_user_id, template_id, data, event["id"])
 
 
 def notify_approval_result_subscribe(target_user_id: int, cal: dict, event: dict, result_text: str, remark: str):
@@ -147,7 +146,15 @@ def notify_approval_result_subscribe(target_user_id: int, cal: dict, event: dict
         "thing4": {"value": shorten_text(remark, 20)},
         "thing5": {"value": shorten_text(cal.get("name"), 20, "未命名日历")},
     }
-    return send_subscribe_if_accepted(target_user_id, template_id, data, event["id"])
+    return build_subscribe_payload_if_accepted(target_user_id, template_id, data, event["id"])
+
+
+def normalize_remind_before_minutes(value: int | None) -> int | None:
+    if value is None:
+        return None
+    if value < 0:
+        raise HTTPException(status_code=400, detail="提醒时间不能小于0")
+    return value
 
 
 def create_single_event_for_calendar(cal_id: int, payload: schemas.BatchCreateEventsRequest, user: dict):
@@ -182,7 +189,9 @@ def create_single_event_for_calendar(cal_id: int, payload: schemas.BatchCreateEv
         content=payload.content,
         status=status,
         event_type="normal",
+        remind_before_minutes=payload.remind_before_minutes,
     )
+    subscribe_to_send_list = []
     if not is_creator:
         db.create_notification(
             user_id=cal["creator_id"],
@@ -192,8 +201,18 @@ def create_single_event_for_calendar(cal_id: int, payload: schemas.BatchCreateEv
             ref_event_id=event["id"],
             ref_cal_id=cal_id,
         )
-        notify_schedule_update_subscribe(cal["creator_id"], cal, event, user["nick_name"], "创建日程")
-    return {"calendar_id": cal_id, "calendar_name": cal["name"], "ok": True, "event_id": event["id"]}
+        payload_to_send = notify_schedule_update_subscribe(
+            cal["creator_id"], cal, event, user["nick_name"], "创建日程"
+        )
+        if payload_to_send:
+            subscribe_to_send_list.append(payload_to_send)
+    return {
+        "calendar_id": cal_id,
+        "calendar_name": cal["name"],
+        "ok": True,
+        "event_id": event["id"],
+        "subscribe_to_send_list": subscribe_to_send_list,
+    }
 
 # ── 认证 ──────────────────────────────────────────────────────────
 
@@ -302,12 +321,15 @@ def create_event(cal_id: int, body: schemas.CreateEventRequest, user=Depends(get
                 detail=f"与创建者事件时间冲突：{conflicts[0]['title']}（{conflicts[0]['start_time']} ~ {conflicts[0]['end_time']}）")
 
     status = "approved" if is_creator else "pending"
+    remind_before_minutes = normalize_remind_before_minutes(body.remind_before_minutes)
     event = db.create_event(
         cal_id=cal_id, creator_id=user["id"], title=body.title,
         start_time=body.start_time, end_time=final_end_time,
         location=body.location, content=body.content,
         status=status, event_type="normal",
+        remind_before_minutes=remind_before_minutes,
     )
+    subscribe_to_send_list = []
 
     if not is_creator:
         db.create_notification(
@@ -316,8 +338,10 @@ def create_event(cal_id: int, body: schemas.CreateEventRequest, user=Depends(get
             content=f"成员「{user['nick_name']}」在「{cal['name']}」创建了事件「{body.title}」，请审批。",
             ref_event_id=event["id"], ref_cal_id=cal_id,
         )
-        notify_schedule_update_subscribe(cal["creator_id"], cal, event, user["nick_name"], "创建日程")
-    return event
+        payload_to_send = notify_schedule_update_subscribe(cal["creator_id"], cal, event, user["nick_name"], "创建日程")
+        if payload_to_send:
+            subscribe_to_send_list.append(payload_to_send)
+    return {**event, "subscribe_to_send_list": subscribe_to_send_list}
 
 @app.get("/calendars/{cal_id}/events", response_model=list[schemas.Event])
 def list_events(cal_id: int, user=Depends(get_current_user)):
@@ -390,7 +414,10 @@ def update_event(cal_id: int, event_id: int, body: schemas.UpdateEventRequest, u
 
     # 仅在确实有字段变化时才通知（避免空更新/同值更新）
     incoming = body.model_dump(exclude_unset=True)
-    comparable_fields = ["title", "start_time", "end_time", "location", "content"]
+    if "remind_before_minutes" in incoming:
+        incoming["remind_before_minutes"] = normalize_remind_before_minutes(incoming["remind_before_minutes"])
+        body.remind_before_minutes = incoming["remind_before_minutes"]
+    comparable_fields = ["title", "start_time", "end_time", "location", "content", "remind_before_minutes"]
 
     def _normalize(v):
         return "" if v is None else v
@@ -403,6 +430,7 @@ def update_event(cal_id: int, event_id: int, body: schemas.UpdateEventRequest, u
     new_status = "pending" if (not is_creator and has_real_changes) else event["status"]
 
     updated_event = db.update_event(event_id, body, new_status)
+    subscribe_to_send_list = []
 
     if (not is_creator) and has_real_changes:
         db.create_notification(
@@ -411,9 +439,13 @@ def update_event(cal_id: int, event_id: int, body: schemas.UpdateEventRequest, u
             content=f"成员「{user['nick_name']}」修改了事件「{updated_event['title']}」，待你审批。",
             ref_event_id=event_id, ref_cal_id=cal_id,
         )
-        notify_schedule_update_subscribe(cal["creator_id"], cal, updated_event, user["nick_name"], "修改日程")
+        payload_to_send = notify_schedule_update_subscribe(
+            cal["creator_id"], cal, updated_event, user["nick_name"], "修改日程"
+        )
+        if payload_to_send:
+            subscribe_to_send_list.append(payload_to_send)
 
-    return updated_event
+    return {**updated_event, "subscribe_to_send_list": subscribe_to_send_list}
 
 
 # 删除事件
@@ -437,16 +469,16 @@ def delete_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
     # 创建者可直接删除
     if is_creator:
         db.delete_event(event_id)
-        return {"ok": True, "message": "删除成功"}
+        return {"ok": True, "message": "删除成功", "subscribe_to_send_list": []}
 
     # 新规则：未通过(rejected)事件，成员可直接删除，无需审批
     if event["status"] == "rejected":
         db.delete_event(event_id)
-        return {"ok": True, "message": "未通过事件已删除"}
+        return {"ok": True, "message": "未通过事件已删除", "subscribe_to_send_list": []}
 
     # 其余成员删除走删除审批：新增状态 delete_pending
     if event["status"] == "delete_pending":
-        return {"ok": True, "message": "删除申请已提交，等待审批"}
+        return {"ok": True, "message": "删除申请已提交，等待审批", "subscribe_to_send_list": []}
 
     db.update_event_status(event_id, "delete_pending")
     db.create_notification(
@@ -455,8 +487,9 @@ def delete_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
         content=f"成员「{user['nick_name']}」申请删除「{event['title']}」，请审批。",
         ref_event_id=event_id, ref_cal_id=cal_id,
     )
-    notify_schedule_update_subscribe(cal["creator_id"], cal, event, user["nick_name"], "删除日程")
-    return {"ok": True, "message": "删除申请已提交，待创建者审批"}
+    payload_to_send = notify_schedule_update_subscribe(cal["creator_id"], cal, event, user["nick_name"], "删除日程")
+    subscribe_to_send_list = [payload_to_send] if payload_to_send else []
+    return {"ok": True, "message": "删除申请已提交，待创建者审批", "subscribe_to_send_list": subscribe_to_send_list}
 
 
 # 同意审批（合并：普通审批通过 + 删除审批通过）
@@ -478,10 +511,14 @@ def approve_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
             content=f"你在「{cal['name']}」申请删除的事件「{event['title']}」已通过并删除。",
             ref_event_id=event_id, ref_cal_id=cal_id,
         )
-        notify_approval_result_subscribe(
+        payload_to_send = notify_approval_result_subscribe(
             event["creator_id"], cal, event, "审批通过", f"事件{event['title']}删除审批通过"
         )
-        return {"ok": True, "message": "删除申请已通过，事件已删除"}
+        return {
+            "ok": True,
+            "message": "删除申请已通过，事件已删除",
+            "subscribe_to_send_list": [payload_to_send] if payload_to_send else [],
+        }
 
     # 普通待审批通过
     if event["status"] != "pending":
@@ -494,10 +531,10 @@ def approve_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
         content=f"你在「{cal['name']}」创建的事件「{event['title']}」已通过审批。",
         ref_event_id=event_id, ref_cal_id=cal_id,
     )
-    notify_approval_result_subscribe(
+    payload_to_send = notify_approval_result_subscribe(
         event["creator_id"], cal, event, "审批通过", f"事件{event['title']}审批成功"
     )
-    return {"ok": True, "message": "审批通过"}
+    return {"ok": True, "message": "审批通过", "subscribe_to_send_list": [payload_to_send] if payload_to_send else []}
 
 
 # 拒绝审批（合并：普通审批拒绝 + 删除审批驳回）
@@ -521,10 +558,10 @@ def reject_event(cal_id: int, event_id: int, body: schemas.RejectRequest, user=D
             content=f"你在「{cal['name']}」申请删除的事件「{event['title']}」未通过。原因：{reason}",
             ref_event_id=event_id, ref_cal_id=cal_id,
         )
-        notify_approval_result_subscribe(
+        payload_to_send = notify_approval_result_subscribe(
             event["creator_id"], cal, event, "审批驳回", f"事件{event['title']}删除审批驳回"
         )
-        return {"ok": True, "message": "删除申请已驳回"}
+        return {"ok": True, "message": "删除申请已驳回", "subscribe_to_send_list": [payload_to_send] if payload_to_send else []}
 
     # 普通审批拒绝
     db.update_event_status(event_id, "rejected")
@@ -534,10 +571,10 @@ def reject_event(cal_id: int, event_id: int, body: schemas.RejectRequest, user=D
         content=f"你在「{cal['name']}」创建的事件「{event['title']}」审批未通过。原因：{reason}",
         ref_event_id=event_id, ref_cal_id=cal_id,
     )
-    notify_approval_result_subscribe(
+    payload_to_send = notify_approval_result_subscribe(
         event["creator_id"], cal, event, "审批驳回", f"事件{event['title']}审批失败"
     )
-    return {"ok": True, "message": "审批已拒绝"}
+    return {"ok": True, "message": "审批已拒绝", "subscribe_to_send_list": [payload_to_send] if payload_to_send else []}
 
 # ── 指派事件（附加功能2） ─────────────────────────────────────────
 
@@ -562,6 +599,7 @@ def create_assigned_event(cal_id: int, body: schemas.CreateAssignedEventRequest,
         start_time=body.start_time, end_time=body.end_time,
         location=body.location, content=body.content,
         status="approved", event_type="assigned",
+        remind_before_minutes=10,
     )
     db.set_assigned_members(event["id"], body.assigned_member_ids)
 
@@ -763,15 +801,19 @@ def dismiss_captured_notification(captured_id: int, user=Depends(get_current_use
 def batch_create_events(body: schemas.BatchCreateEventsRequest, user=Depends(get_current_user)):
     if not body.calendar_ids:
         raise HTTPException(status_code=400, detail="请至少选择一个日历")
+    body.remind_before_minutes = normalize_remind_before_minutes(body.remind_before_minutes)
 
     results = []
     all_ok = True
+    subscribe_to_send_list = []
     for cal_id in body.calendar_ids:
         result = create_single_event_for_calendar(cal_id, body, user)
         if not result["ok"]:
             all_ok = False
+        for payload in result.pop("subscribe_to_send_list", []) or []:
+            subscribe_to_send_list.append(payload)
         results.append(result)
-    return {"all_ok": all_ok, "results": results}
+    return {"all_ok": all_ok, "results": results, "subscribe_to_send_list": subscribe_to_send_list}
 
 
 @app.post("/captured-notifications/{captured_id}/create-events", response_model=schemas.CreateEventsFromCapturedResponse)

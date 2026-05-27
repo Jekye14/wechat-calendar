@@ -43,6 +43,17 @@
       <text class="label">内容</text>
       <textarea class="textarea" placeholder="选填，填写事件详细内容" value="{{content}}" bindinput="onContentInput"/>
     </view>
+    <view class="divider"></view>
+
+    <view class="field">
+      <text class="label">提醒时间</text>
+      <picker mode="selector" range="{{remindOptions}}" range-key="label" value="{{remindOptionIndex}}" bindchange="onRemindChange">
+        <view class="picker-box">{{remindOptions[remindOptionIndex].label}}</view>
+      </picker>
+      <view wx:if="{{remindSubscribeHint}}" class="sub-tip" bindtap="goSubscribeSettings">
+        提醒依赖订阅消息授权，可在「通知」页开启/更新授权
+      </view>
+    </view>
     <view class="divider" wx:if="{{!isEdit}}"></view>
 
     <view class="field" wx:if="{{!isEdit}}">

@@ -67,6 +67,7 @@ class CreateEventRequest(BaseModel):
     end_time: Optional[str] = None
     location: Optional[str] = ""
     content: Optional[str] = ""
+    remind_before_minutes: Optional[int] = 10
 
 class CreateAssignedEventRequest(BaseModel):
     title: str
@@ -82,6 +83,7 @@ class UpdateEventRequest(BaseModel):
     end_time: Optional[str] = None
     location: Optional[str] = None
     content: Optional[str] = None
+    remind_before_minutes: Optional[int] = None
 
 class Event(BaseModel):
     id: int
@@ -93,9 +95,12 @@ class Event(BaseModel):
     end_time: str
     location: str
     content: str
+    remind_before_minutes: Optional[int] = None
+    reminder_sent_at: Optional[datetime] = None
     status: str           # pending / approved / rejected / delete_pending
     event_type: str       # normal / assigned
     assignees: list[dict] = []
+    subscribe_to_send_list: list[dict] = []
     created_at: datetime
     updated_at: datetime
 
@@ -175,6 +180,7 @@ class BatchCreateEventsRequest(BaseModel):
     end_time: Optional[str] = None
     location: Optional[str] = ""
     content: Optional[str] = ""
+    remind_before_minutes: Optional[int] = 10
 
 
 class BatchCreateEventResult(BaseModel):
@@ -188,8 +194,10 @@ class BatchCreateEventResult(BaseModel):
 class BatchCreateEventsResponse(BaseModel):
     all_ok: bool
     results: list[BatchCreateEventResult]
+    subscribe_to_send_list: list[dict] = []
 
 
 class CreateEventsFromCapturedResponse(BaseModel):
     all_ok: bool
     results: list[BatchCreateEventResult]
+    subscribe_to_send_list: list[dict] = []
