@@ -73,6 +73,14 @@ class FirstFragment : Fragment() {
             }
         }
 
+        binding.buttonBindHelp.setOnClickListener {
+            AlertDialog.Builder(ctx)
+                .setTitle("绑定说明")
+                .setMessage("打开小程序首页，点击“生成绑定码”按钮（生成后自动复制绑定码），将绑定码粘贴到该输入框中，点击“绑定账号”即可使用通知捕获功能。")
+                .setPositiveButton("知道了", null)
+                .show()
+        }
+
         binding.switchCapture.setOnCheckedChangeListener { _, checked ->
             if (checked) {
                 val ok = ensureNotificationAccessOrPrompt()

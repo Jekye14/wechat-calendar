@@ -61,14 +61,37 @@
                 android:orientation="vertical"
                 android:padding="20dp">
 
-                <TextView
-                    android:id="@+id/text_bind_status"
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="未绑定"
-                    android:textColor="#F44336"
-                    android:textSize="16sp"
-                    android:textStyle="bold" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/text_bind_status"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="未绑定"
+                        android:textColor="#F44336"
+                        android:textSize="16sp"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/button_bind_help"
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_marginStart="8dp"
+                        android:padding="0dp"
+                        android:text="?"
+                        android:textSize="16sp"
+                        android:textColor="#616161"
+                        android:backgroundTint="@android:color/transparent"
+                        android:stateListAnimator="@null"
+                        app:cornerRadius="14dp"
+                        app:strokeColor="#616161"
+                        app:strokeWidth="1dp" />
+                </LinearLayout>
 
                 <EditText
                     android:id="@+id/edit_bind_code"
