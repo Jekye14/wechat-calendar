@@ -74,41 +74,79 @@ Page({
   },
 
   requestSubscribe() {
+    // 必须在用户 tap 的同步调用栈内直接调用 requestSubscribeMessage
+    const config = this.data.subscribeConfig
+    const tmplIds = [
+      config && config.approval_result_template_id,
+      config && config.schedule_update_template_id,
+    ].filter(Boolean)
+  
+    if (!tmplIds.length) {
+      wx.showToast({ title: '模板未配置', icon: 'none' })
+      return
+    }
+  
     this.setData({ subscribeLoading: true })
-    app.request({ url: '/subscribe/config' }).then((config) => {
-      const tmplIds = [
-        config.approval_result_template_id,
-        config.schedule_update_template_id,
-      ].filter(Boolean)
-
-      if (!tmplIds.length) {
-        this.setData({ subscribeLoading: false })
-        wx.showToast({ title: '模板未配置', icon: 'none' })
-        return
-      }
-
-      wx.requestSubscribeMessage({
-        tmplIds,
-        success: (res) => {
-          app.request({
-            url: '/subscribe/report',
-            method: 'POST',
-            data: { result: res },
-          }).finally(() => {
-            this.setData({ subscribeLoading: false })
-            this.loadSubscribeStatus()
-            wx.showToast({ title: '授权结果已更新', icon: 'none' })
-          })
-        },
-        fail: () => {
+  
+    wx.requestSubscribeMessage({
+      tmplIds,
+      success: (res) => {
+        // 这里再异步上报后端没问题
+        app.request({
+          url: '/subscribe/report',
+          method: 'POST',
+          data: { result: res },
+        }).finally(() => {
           this.setData({ subscribeLoading: false })
-          wx.showToast({ title: '订阅授权未完成', icon: 'none' })
-        },
-      })
-    }).catch(() => {
-      this.setData({ subscribeLoading: false })
+          this.loadSubscribeStatus()
+          wx.showToast({ title: '授权结果已更新', icon: 'none' })
+        })
+      },
+      fail: (err) => {
+        console.log('requestSubscribeMessage fail:', err)
+        this.setData({ subscribeLoading: false })
+        wx.showToast({ title: err?.errMsg || '订阅授权未完成', icon: 'none' })
+      },
     })
   },
+
+//   requestSubscribe() {
+//     this.setData({ subscribeLoading: true })
+//     app.request({ url: '/subscribe/config' }).then((config) => {
+//       const tmplIds = [
+//         config.approval_result_template_id,
+//         config.schedule_update_template_id,
+//       ].filter(Boolean)
+
+//       if (!tmplIds.length) {
+//         this.setData({ subscribeLoading: false })
+//         wx.showToast({ title: '模板未配置', icon: 'none' })
+//         return
+//       }
+// 
+//       wx.requestSubscribeMessage({
+//         tmplIds,
+//         success: (res) => {
+//           app.request({
+//             url: '/subscribe/report',
+//             method: 'POST',
+//             data: { result: res },
+//           }).finally(() => {
+//             this.setData({ subscribeLoading: false })
+//             this.loadSubscribeStatus()
+//             wx.showToast({ title: '授权结果已更新', icon: 'none' })
+//           })
+//         },
+//         fail: (err) => {
+//           this.setData({ subscribeLoading: false })
+//           console.log('requestSubscribeMessage fail:', err)
+//           wx.showToast({ title: '订阅授权未完成', icon: 'none' })
+//         },
+//       })
+//     }).catch(() => {
+//       this.setData({ subscribeLoading: false })
+//     })
+//   },
 
   goToEvent(e) {
     const { eventId } = e.currentTarget.dataset
@@ -121,3 +159,11 @@ Page({
     return { new_event: '📋', approved: '✅', rejected: '❌', assigned: '📌' }[type] || '🔔'
   },
 })
+
+function formatDateTime(s) {
+    if (!s) return ''
+    return String(s)
+      .replace('T', ' ')
+      .replace(/\.\d{3}.*/, '') // 去掉毫秒及其后内容（如果有）
+      .replace(/Z$/, '')        // 去掉末尾 Z（如果有）
+  }

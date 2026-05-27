@@ -176,3 +176,11 @@ Page({
     })
   },
 })
+
+function formatDateTime(s) {
+    if (!s) return ''
+    return String(s)
+      .replace('T', ' ')
+      .replace(/\.\d{3}.*/, '') // 去掉毫秒及其后内容（如果有）
+      .replace(/Z$/, '')        // 去掉末尾 Z（如果有）
+  }
