@@ -11,7 +11,7 @@ __pycache__/
 .idea/
 
 # cloud functions
-cloudfunctions/**/node_modules/
+wechat-calendar/frontend/cloudfunctions/**/node_modules/
 
 其他日历.docx
 AppSecret.txt
