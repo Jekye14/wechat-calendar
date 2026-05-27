@@ -15,6 +15,17 @@ Page({
     endTime: '10:00',
     location: '',
     content: '',
+    remindOptions: [
+      { label: '不提醒', value: 'null' },
+      { label: '到点提醒(0分钟)', value: '0' },
+      { label: '提前5分钟', value: '5' },
+      { label: '提前10分钟', value: '10' },
+      { label: '提前15分钟', value: '15' },
+      { label: '提前30分钟', value: '30' },
+      { label: '提前60分钟', value: '60' },
+    ],
+    remindOptionIndex: 3,
+    remindSubscribeHint: true,
     calendars: [],
     selectedCalendarIds: [],
     submitting: false,
@@ -134,6 +145,8 @@ Page({
         title: event.title || '',
         location: event.location || '',
         content: event.content || '',
+        remindOptionIndex: this.findRemindOptionIndex(event.remind_before_minutes),
+        remindSubscribeHint: event.remind_before_minutes !== null,
         startDate: start ? this.formatDate(start) : this.todayStr(),
         startTime: start ? this.formatClock(start) : '09:00',
         endDate: end ? this.formatDate(end) : this.todayStr(),
@@ -151,6 +164,14 @@ Page({
   onStartTimeChange(e) { this.setData({ startTime: e.detail.value }) },
   onEndDateChange(e)   { this.setData({ endDate: e.detail.value }) },
   onEndTimeChange(e)   { this.setData({ endTime: e.detail.value }) },
+  onRemindChange(e) {
+    const remindOptionIndex = parseInt(e.detail.value, 10) || 0
+    const remindValue = this.getRemindBeforeMinutes(remindOptionIndex)
+    this.setData({ remindOptionIndex, remindSubscribeHint: remindValue !== null })
+  },
+  goSubscribeSettings() {
+    wx.navigateTo({ url: '/pages/notification/notification' })
+  },
 //   onCalendarChange(e) {
 //     this.data.selectedCalendarIds = e.detail.value || []
 //     console.log(this.data.selectedCalendarIds)
@@ -179,7 +200,7 @@ Page({
   submit() {
     const {
       title, startDate, startTime, endDate, endTime, location, content,
-      calId, eventId, isEdit, fromCaptured, capturedId, submitting, selectedCalendarIds
+      calId, eventId, isEdit, fromCaptured, capturedId, submitting, selectedCalendarIds, remindOptionIndex
     } = this.data
     console.log('SUBMIT', Date.now())
     if (submitting) return
@@ -188,6 +209,7 @@ Page({
 
     const startFull = `${startDate} ${startTime}:00`
     const endFull   = `${endDate} ${endTime}:00`
+    const remindBeforeMinutes = this.getRemindBeforeMinutes(remindOptionIndex)
     if (startFull >= endFull) return wx.showToast({ title: '结束时间须晚于开始时间', icon: 'none' })
     if (!isEdit && (!selectedCalendarIds || selectedCalendarIds.length === 0)) {
       return wx.showToast({ title: '请至少选择一个日历', icon: 'none' })
@@ -204,8 +226,10 @@ Page({
           end_time: endFull,
           location: location.trim(),
           content: content.trim(),
+          remind_before_minutes: remindBeforeMinutes,
         }
-      }).then(() => {
+      }).then((res) => {
+        app.sendSubscribePayloads(res.subscribe_to_send_list)
         wx.showToast({ title: '修改成功' })
         setTimeout(() => wx.navigateBack(), 1200)
       }).catch(() => this.setData({ submitting: false }))
@@ -221,12 +245,14 @@ Page({
       end_time: endFull,
       location: location.trim(),
       content: content.trim(),
+      remind_before_minutes: remindBeforeMinutes,
     }
     const url = fromCaptured
       ? `/captured-notifications/${capturedId}/create-events`
       : '/events/batch-create'
 
     app.request({ url, method: 'POST', data: body }).then((result) => {
+      app.sendSubscribePayloads(result.subscribe_to_send_list)
       this.showBatchResult(result).then(() => {
         if (result.all_ok) {
           wx.showToast({ title: fromCaptured ? '创建并确认成功' : '创建成功' })
@@ -243,5 +269,16 @@ Page({
   todayStr() {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  },
+
+  getRemindBeforeMinutes(index) {
+    const option = this.data.remindOptions[index] || this.data.remindOptions[3]
+    return option.value === 'null' ? null : parseInt(option.value, 10)
+  },
+
+  findRemindOptionIndex(value) {
+    const normalized = value === null || value === undefined ? 'null' : String(value)
+    const idx = this.data.remindOptions.findIndex(item => item.value === normalized)
+    return idx >= 0 ? idx : 3
   },
 })

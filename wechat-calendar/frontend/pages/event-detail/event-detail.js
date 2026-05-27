@@ -88,7 +88,8 @@ Page({
           app.request({
             url: `/calendars/${this.data.calId}/events/${this.data.eventId}/approve`,
             method: 'POST',
-          }).then(() => {
+          }).then((res) => {
+            app.sendSubscribePayloads(res.subscribe_to_send_list)
             wx.showToast({ title: '已通过' })
             this.load()
           })
@@ -106,7 +107,8 @@ Page({
       url: `/calendars/${this.data.calId}/events/${this.data.eventId}/reject`,
       method: 'POST',
       data: { reason: this.data.rejectReason },
-    }).then(() => {
+    }).then((res) => {
+      app.sendSubscribePayloads(res.subscribe_to_send_list)
       this.setData({ showRejectModal: false })
       wx.showToast({ title: '已拒绝' })
       this.load()
@@ -127,7 +129,8 @@ Page({
           app.request({
             url: `/calendars/${this.data.calId}/events/${this.data.eventId}/approve`,
             method: 'POST',
-          }).then(() => {
+          }).then((res) => {
+            app.sendSubscribePayloads(res.subscribe_to_send_list)
             wx.showToast({ title: '已同意删除' })
             this.load()
           })
@@ -153,7 +156,8 @@ Page({
       url: `/calendars/${this.data.calId}/events/${this.data.eventId}/reject`,
       method: 'POST',
       data: { reason: this.data.rejectDeletionReason },
-    }).then(() => {
+    }).then((res) => {
+      app.sendSubscribePayloads(res.subscribe_to_send_list)
       this.setData({ showRejectDeletionModal: false })
       wx.showToast({ title: '已驳回' })
       this.load()
@@ -179,6 +183,7 @@ Page({
             url: `/calendars/${this.data.calId}/events/${this.data.eventId}`,
             method: 'DELETE'
           }).then((response) => {
+            app.sendSubscribePayloads(response.subscribe_to_send_list)
             const msg = needsApproval ? '删除申请已提交，等待创建者审批' : '删除成功'
             wx.showToast({ title: msg })
             setTimeout(() => wx.navigateBack(), 1000)

@@ -6,6 +6,7 @@ App({
 
     // 云托管配置
     cloudEnv: 'prod-0g6c5yfpa326bfaf',
+    resourceEnv: 'cloud1-d2gadtxsif7c3d56f',
     serviceName: 'django-ifdx',
 
     // 不再需要走域名/baseUrl
@@ -19,10 +20,10 @@ App({
     })
     // 2. 为订阅消息创建一个新的实例，用于访问云开发环境
     this.subscribeCloud = new wx.cloud.Cloud({
-        resourceEnv: 'cloud1-d2gadtxsif7c3d56f', // 这里换成上一步找到的云开发环境ID
-    });
+      resourceEnv: this.globalData.resourceEnv,
+    })
     // 实例创建后必须调用 init 方法
-    this.subscribeCloud.init();
+    this.subscribeCloud.init()
 
     const openid = wx.getStorageSync('openid')
     const userInfo = wx.getStorageSync('userInfo')
@@ -61,5 +62,22 @@ App({
         }
       })
     })
-  }
+  },
+
+  sendSubscribePayloads(subscribeToSendList) {
+    const list = Array.isArray(subscribeToSendList) ? subscribeToSendList : []
+    if (!list.length || !this.subscribeCloud) return Promise.resolve()
+
+    const tasks = list.map(payload =>
+      this.subscribeCloud.callHTTPFunction({
+        name: 'sendSubscribe',
+        path: '/send',
+        method: 'POST',
+        data: payload,
+      }).catch(err => {
+        console.log('callHTTPFunction sendSubscribe fail:', err, payload)
+      })
+    )
+    return Promise.all(tasks)
+  },
 })

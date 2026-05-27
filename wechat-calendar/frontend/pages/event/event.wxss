@@ -37,6 +37,7 @@
   padding: 16rpx 20rpx; font-size: 28rpx; color: #222; text-align: center;
 }
 .tip { font-size: 24rpx; color: #999; padding: 0 8rpx 24rpx; line-height: 1.6; }
+.sub-tip { margin-top: 12rpx; font-size: 24rpx; color: #4A90D9; line-height: 1.5; }
 .cal-option { display: flex; align-items: center; padding: 10rpx 0; }
 .cal-name { margin-left: 12rpx; color: #333; font-size: 28rpx; }
 .submit-btn {

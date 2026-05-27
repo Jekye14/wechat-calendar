@@ -218,6 +218,37 @@ def init_db():
             """)
 
         conn.commit()
+        _ensure_events_reminder_columns(conn)
+
+
+def _column_exists(conn, table_name: str, column_name: str) -> bool:
+    row = _fetchone(conn, """
+        SELECT 1 AS ok
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s AND COLUMN_NAME=%s
+        LIMIT 1
+    """, (MYSQL_DATABASE, table_name, column_name))
+    return row is not None
+
+
+def _ensure_events_reminder_columns(conn):
+    try:
+        if not _column_exists(conn, "events", "remind_before_minutes"):
+            with conn.cursor() as cur:
+                cur.execute(
+                    "ALTER TABLE events ADD COLUMN remind_before_minutes INT NULL DEFAULT 10 AFTER content"
+                )
+    except Exception:
+        pass
+    try:
+        if not _column_exists(conn, "events", "reminder_sent_at"):
+            with conn.cursor() as cur:
+                cur.execute(
+                    "ALTER TABLE events ADD COLUMN reminder_sent_at DATETIME NULL AFTER remind_before_minutes"
+                )
+    except Exception:
+        pass
+    conn.commit()
 
 
 # ── 用户 ────────────────────────────────────────────────────
@@ -360,15 +391,15 @@ def remove_member(cal_id: int, user_id: int):
 # ── 事件 ────────────────────────────────────────────────────
 
 def create_event(cal_id, creator_id, title, start_time, end_time,
-                 location, content, status, event_type) -> dict:
+                 location, content, status, event_type, remind_before_minutes=10) -> dict:
     with get_conn() as conn:
         new_id = _execute(conn, """
             INSERT INTO events
                 (calendar_id, creator_id, title, start_time, end_time,
-                 location, content, status, event_type)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                 location, content, remind_before_minutes, status, event_type)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (cal_id, creator_id, title, start_time, end_time,
-              location or "", content or "", status, event_type))
+              location or "", content or "", remind_before_minutes, status, event_type))
         conn.commit()
         return _get_event_with_creator(conn, new_id)
 
@@ -413,6 +444,7 @@ def update_event(event_id: int, body, new_status: str) -> dict:
         if not event:
             return None
         e = dict(event)
+        incoming = body.model_dump(exclude_unset=True) if hasattr(body, "model_dump") else {}
 
         _execute(conn, """
             UPDATE events SET
@@ -421,15 +453,17 @@ def update_event(event_id: int, body, new_status: str) -> dict:
                 end_time=%s,
                 location=%s,
                 content=%s,
+                remind_before_minutes=%s,
                 status=%s,
                 updated_at=CURRENT_TIMESTAMP
             WHERE id=%s
         """, (
-            getattr(body, "title", None) or e["title"],
-            getattr(body, "start_time", None) or e["start_time"],
-            getattr(body, "end_time", None) or e["end_time"],
-            (body.location if getattr(body, "location", None) is not None else e["location"]),
-            (body.content if getattr(body, "content", None) is not None else e["content"]),
+            incoming["title"] if ("title" in incoming and incoming["title"] is not None) else e["title"],
+            incoming["start_time"] if ("start_time" in incoming and incoming["start_time"] is not None) else e["start_time"],
+            incoming["end_time"] if ("end_time" in incoming and incoming["end_time"] is not None) else e["end_time"],
+            incoming["location"] if ("location" in incoming and incoming["location"] is not None) else e["location"],
+            incoming["content"] if ("content" in incoming and incoming["content"] is not None) else e["content"],
+            incoming["remind_before_minutes"] if "remind_before_minutes" in incoming else e.get("remind_before_minutes"),
             new_status,
             event_id,
         ))
