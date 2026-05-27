@@ -32,7 +32,7 @@
       <view class="notif-body">
         <view class="notif-title">{{item.title}}</view>
         <view class="notif-content">{{item.content}}</view>
-        <view class="notif-time">{{item.created_at}}</view>
+        <view class="notif-time">{{item.created_at_text}}</view>
       </view>
       <view wx:if="{{!item.is_read}}" class="unread-dot"></view>
     </view>
