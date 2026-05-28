@@ -130,8 +130,11 @@ exports.main = async () => {
     )
 
     if (!events.length) {
+      console.log('[reminderCron] 无待提醒事件')
       return { ok: true, scanned: 0, sent: 0, marked: 0 }
     }
+
+    console.log(`[reminderCron] 查询到待提醒事件: ${events.length}个`)
 
     const { accessToken } = await cloud.getAccessToken()
     let sentCount = 0
@@ -141,6 +144,7 @@ exports.main = async () => {
       const recipientIds = Array.from(new Set([event.calendar_creator_id, event.creator_id].filter(Boolean)))
       let eventSent = 0
       const startAt = parseStartTime(event.start_time)
+      console.log(`[reminderCron] 事件${event.id} "${event.title}": recipients=${recipientIds.length}`)
 
       for (const recipientId of recipientIds) {
         const [prefRows] = await conn.execute(
@@ -152,7 +156,10 @@ exports.main = async () => {
           `,
           [recipientId, WX_TMPL_EVENT_REMINDER]
         )
-        if (!prefRows.length || prefRows[0].state !== 'accept') continue
+        if (!prefRows.length || prefRows[0].state !== 'accept') {
+          console.log(`[reminderCron] 事件${event.id}: 用户${recipientId}未订阅(${prefRows.length ? prefRows[0].state : 'no_record'}), 跳过`)
+          continue
+        }
 
         const [userRows] = await conn.execute(
           `
@@ -180,6 +187,9 @@ exports.main = async () => {
         if (result && result.errcode === 0) {
           sentCount += 1
           eventSent += 1
+          console.log(`[reminderCron] 事件${event.id}: 发送成功 -> 用户${recipientId}`)
+        } else {
+          console.log(`[reminderCron] 事件${event.id}: 发送失败 -> 用户${recipientId} errcode=${result?.errcode} errmsg=${result?.errmsg}`)
         }
       }
 
@@ -189,6 +199,7 @@ exports.main = async () => {
       }
     }
 
+    console.log(`[reminderCron] 完成: scanned=${events.length} sent=${sentCount} marked=${markedCount}`)
     return { ok: true, scanned: events.length, sent: sentCount, marked: markedCount }
   } finally {
     await conn.end()

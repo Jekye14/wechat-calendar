@@ -81,6 +81,14 @@ const server = http.createServer(async (req, res) => {
     if (page) wechatPayload.page = page
 
     const result = await postWechatSubscribe(accessToken, wechatPayload)
+    if (result.errcode !== 0) {
+      console.error('[sendSubscribe] 微信API返回错误:', {
+        errcode: result.errcode,
+        errmsg: result.errmsg,
+        openid,
+        template_id,
+      })
+    }
     writeJson(res, 200, { ok: true, result })
   } catch (err) {
     console.error('send subscribe error:', err)

@@ -74,8 +74,19 @@ App({
         path: '/send',
         method: 'POST',
         data: payload,
+      }).then(res => {
+        // 检查微信API返回的错误码
+        if (res && res.result && res.result.errcode !== 0) {
+          console.error('[订阅消息] 微信API返回错误:', {
+            errcode: res.result.errcode,
+            errmsg: res.result.errmsg,
+            template_id: payload.template_id,
+            openid: payload.openid,
+          })
+        }
+        return res
       }).catch(err => {
-        console.log('callHTTPFunction sendSubscribe fail:', err, payload)
+        console.error('[订阅消息] 云函数调用失败:', err, payload)
       })
     )
     return Promise.all(tasks)

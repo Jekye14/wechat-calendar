@@ -40,6 +40,7 @@ Page({
     const tmplIds = [
       config && config.approval_result_template_id,
       config && config.schedule_update_template_id,
+      config && config.event_reminder_template_id,
     ].filter(Boolean)
     const states = tmplIds.map(id => statusMap[id] || 'unknown')
 
@@ -83,6 +84,7 @@ Page({
     const tmplIds = [
       config && config.approval_result_template_id,
       config && config.schedule_update_template_id,
+      config && config.event_reminder_template_id,
     ].filter(Boolean)
   
     if (!tmplIds.length) {

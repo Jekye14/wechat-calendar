@@ -74,6 +74,7 @@ def get_subscribe_config() -> dict:
     return {
         "approval_result_template_id": (os.environ.get("WX_TMPL_APPROVAL_RESULT") or "").strip(),
         "schedule_update_template_id": (os.environ.get("WX_TMPL_SCHEDULE_UPDATE") or "").strip(),
+        "event_reminder_template_id": (os.environ.get("WX_TMPL_EVENT_REMINDER") or "").strip(),
     }
 
 
@@ -102,16 +103,23 @@ def get_user_openid(user_id: int) -> str | None:
 
 def build_subscribe_payload_if_accepted(user_id: int, template_id: str, data: dict, event_id: int):
     if not template_id:
+        logger.warning("[订阅消息] 跳过: template_id为空 user_id=%s event_id=%s", user_id, event_id)
         return None
     prefs = db.get_subscribe_prefs(user_id)
-    if prefs.get(template_id) != "accept":
+    current_state = prefs.get(template_id, "unknown")
+    if current_state != "accept":
+        logger.info(
+            "[订阅消息] 跳过: 用户未接受订阅 user_id=%s template_id=%s state=%s event_id=%s",
+            user_id, template_id, current_state, event_id
+        )
         return None
 
     openid = get_user_openid(user_id)
     if not openid:
-        logger.warning("skip subscribe message: user %s has no openid", user_id)
+        logger.warning("[订阅消息] 跳过: 用户无openid user_id=%s event_id=%s", user_id, event_id)
         return None
 
+    logger.info("[订阅消息] 构建成功 user_id=%s template_id=%s event_id=%s", user_id, template_id, event_id)
     return {
         "openid": openid,
         "template_id": template_id,
