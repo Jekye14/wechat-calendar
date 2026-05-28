@@ -124,6 +124,7 @@ class Notification(BaseModel):
 class SubscribeConfigResponse(BaseModel):
     approval_result_template_id: str = ""
     schedule_update_template_id: str = ""
+    event_reminder_template_id: str = ""
 
 
 class SubscribeReportRequest(BaseModel):
