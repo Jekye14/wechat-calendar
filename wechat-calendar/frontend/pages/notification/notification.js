@@ -168,8 +168,25 @@ Page({
 
 function formatDateTime(s) {
   if (!s) return ''
-  return String(s)
-    .replace('T', ' ')
-    .replace(/\.\d+/, '')
-    .replace(/Z$/, '')
+  var str = String(s)
+  var isUtc = str.endsWith('Z') || str.endsWith('z')
+  var dt = new Date(str.replace(' ', 'T'))
+  if (Number.isNaN(dt.getTime())) {
+    return str.replace('T', ' ').replace(/\.\d+/, '').replace(/Z$/i, '')
+  }
+  var y = dt.getUTCFullYear()
+  var M = String(dt.getUTCMonth() + 1).padStart(2, '0')
+  var d = String(dt.getUTCDate()).padStart(2, '0')
+  var hh = String(dt.getUTCHours()).padStart(2, '0')
+  var mm = String(dt.getUTCMinutes()).padStart(2, '0')
+  var ss = String(dt.getUTCSeconds()).padStart(2, '0')
+  var utcTs = Date.UTC(y, parseInt(M) - 1, parseInt(d), parseInt(hh), parseInt(mm), parseInt(ss))
+  var beijingTs = utcTs + 8 * 3600 * 1000
+  var beijingDt = new Date(beijingTs)
+  var by = beijingDt.getUTCFullYear()
+  var bM = String(beijingDt.getUTCMonth() + 1).padStart(2, '0')
+  var bd = String(beijingDt.getUTCDate()).padStart(2, '0')
+  var bh = String(beijingDt.getUTCHours()).padStart(2, '0')
+  var bm = String(beijingDt.getUTCMinutes()).padStart(2, '0')
+  return by + '-' + bM + '-' + bd + ' ' + bh + ':' + bm
 }

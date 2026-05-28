@@ -69,17 +69,24 @@ App({
     if (!list.length || !this.subscribeCloud) return Promise.resolve()
 
     const tasks = list.map(payload =>
-      this.subscribeCloud.callHTTPFunction({
+      this.subscribeCloud.callFunction({
         name: 'sendSubscribe',
-        path: '/send',
-        method: 'POST',
         data: payload,
       }).then(res => {
+        // 检查云函数返回状态
+        if (!res || !res.result) {
+          console.error('[订阅消息] 云函数返回异常:', res)
+          return
+        }
+        if (!res.result.ok) {
+          console.error('[订阅消息] 云函数执行失败:', res.result.err, payload)
+          return
+        }
         // 检查微信API返回的错误码
-        if (res && res.result && res.result.errcode !== 0) {
+        if (res.result.result && res.result.result.errcode !== 0) {
           console.error('[订阅消息] 微信API返回错误:', {
-            errcode: res.result.errcode,
-            errmsg: res.result.errmsg,
+            errcode: res.result.result.errcode,
+            errmsg: res.result.result.errmsg,
             template_id: payload.template_id,
             openid: payload.openid,
           })

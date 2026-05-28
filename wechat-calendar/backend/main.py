@@ -4,7 +4,7 @@
 运行: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import secrets
 
 from fastapi import FastAPI, HTTPException, Depends, Header
@@ -143,6 +143,14 @@ def notify_schedule_update_subscribe(target_user_id: int, cal: dict, event: dict
     return build_subscribe_payload_if_accepted(target_user_id, template_id, data, event["id"])
 
 
+# 北京时区 (UTC+8)，用于所有对外展示的时间格式化
+BEIJING_TZ = timezone(timedelta(hours=8))
+
+def beijing_now() -> datetime:
+    """返回北京时间的当前时刻"""
+    return datetime.now(BEIJING_TZ)
+
+
 def notify_approval_result_subscribe(target_user_id: int, cal: dict, event: dict, result_text: str, remark: str):
     template_id = get_subscribe_config()["approval_result_template_id"]
     if not template_id:
@@ -150,7 +158,7 @@ def notify_approval_result_subscribe(target_user_id: int, cal: dict, event: dict
 
     data = {
         "phrase2": {"value": result_text},
-        "time3": {"value": datetime.now().strftime("%Y-%m-%d %H:%M")},
+        "time3": {"value": beijing_now().strftime("%Y-%m-%d %H:%M")},
         "thing4": {"value": shorten_text(remark, 20)},
         "thing5": {"value": shorten_text(cal.get("name"), 20, "未命名日历")},
     }

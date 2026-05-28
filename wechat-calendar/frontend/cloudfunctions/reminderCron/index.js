@@ -1,5 +1,4 @@
 const cloud = require('wx-server-sdk')
-const https = require('https')
 const mysql = require('mysql2/promise')
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV })
@@ -20,52 +19,30 @@ function normalizeText(value, limit, fallback = '') {
   return text.slice(0, Math.max(0, limit - 1)) + '…'
 }
 
+// 解析事件开始时间（VARCHAR 存储的北京时间字符串，如 "2026-05-28 14:00:00"）
+// 不使用 new Date()，避免运行时时区影响
 function parseStartTime(value) {
   if (!value) return null
-  const normalized = String(value).replace(/\//g, '-').replace('T', ' ')
-  const withSeconds = normalized.length === 16 ? `${normalized}:00` : normalized
-  const dt = new Date(withSeconds.replace(' ', 'T'))
-  if (Number.isNaN(dt.getTime())) return null
-  return dt
+  const str = String(value).replace(/\//g, '-').replace('T', ' ')
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})/)
+  if (!match) return null
+  return {
+    year: parseInt(match[1]),
+    month: parseInt(match[2]),
+    day: parseInt(match[3]),
+    hour: parseInt(match[4]),
+    minute: parseInt(match[5]),
+  }
 }
 
 function formatDateTime(dt) {
   if (!dt) return ''
-  const y = dt.getFullYear()
-  const m = String(dt.getMonth() + 1).padStart(2, '0')
-  const d = String(dt.getDate()).padStart(2, '0')
-  const hh = String(dt.getHours()).padStart(2, '0')
-  const mm = String(dt.getMinutes()).padStart(2, '0')
+  const y = dt.year
+  const m = String(dt.month).padStart(2, '0')
+  const d = String(dt.day).padStart(2, '0')
+  const hh = String(dt.hour).padStart(2, '0')
+  const mm = String(dt.minute).padStart(2, '0')
   return `${y}-${m}-${d} ${hh}:${mm}`
-}
-
-function sendSubscribeMessage(accessToken, payload) {
-  return new Promise((resolve, reject) => {
-    const req = https.request(
-      `https://api.weixin.qq.com/cgi-bin/message/subscribe/send?access_token=${accessToken}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json; charset=utf-8' },
-        timeout: 10000,
-      },
-      (res) => {
-        let raw = ''
-        res.on('data', (chunk) => {
-          raw += chunk
-        })
-        res.on('end', () => {
-          try {
-            resolve(JSON.parse(raw || '{}'))
-          } catch (err) {
-            reject(err)
-          }
-        })
-      }
-    )
-    req.on('timeout', () => req.destroy(new Error('request timeout')))
-    req.on('error', reject)
-    req.end(JSON.stringify(payload))
-  })
 }
 
 exports.main = async () => {
@@ -136,7 +113,6 @@ exports.main = async () => {
 
     console.log(`[reminderCron] 查询到待提醒事件: ${events.length}个`)
 
-    const { accessToken } = await cloud.getAccessToken()
     let sentCount = 0
     let markedCount = 0
 
@@ -172,9 +148,10 @@ exports.main = async () => {
         )
         if (!userRows.length || !userRows[0].openid) continue
 
-        const result = await sendSubscribeMessage(accessToken, {
+        // 使用 cloud.openapi（自动管理 access_token，兼容 wx-server-sdk v3）
+        const result = await cloud.openapi.subscribeMessage.send({
           touser: userRows[0].openid,
-          template_id: WX_TMPL_EVENT_REMINDER,
+          templateId: WX_TMPL_EVENT_REMINDER,
           page: `pages/event-detail/event-detail?id=${event.id}`,
           data: {
             thing1: { value: normalizeText(event.title, 20, '未命名日程') },
@@ -182,14 +159,15 @@ exports.main = async () => {
             thing5: { value: normalizeText(event.location, 20, '无') },
             thing3: { value: normalizeText(event.content, 20, '无') },
           },
+          miniprogramState: 'formal',
         })
 
-        if (result && result.errcode === 0) {
+        if (result && result.errCode === 0) {
           sentCount += 1
           eventSent += 1
           console.log(`[reminderCron] 事件${event.id}: 发送成功 -> 用户${recipientId}`)
         } else {
-          console.log(`[reminderCron] 事件${event.id}: 发送失败 -> 用户${recipientId} errcode=${result?.errcode} errmsg=${result?.errmsg}`)
+          console.log(`[reminderCron] 事件${event.id}: 发送失败 -> 用户${recipientId} errCode=${result?.errCode} errMsg=${result?.errMsg}`)
         }
       }
 
