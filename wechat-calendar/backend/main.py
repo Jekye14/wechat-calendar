@@ -71,6 +71,12 @@ def normalize_end_time(start_time: str, end_time: str | None) -> str:
 
 
 def get_subscribe_config() -> dict:
+    approval_result_template_id = (os.environ.get("WX_TMPL_APPROVAL_RESULT") or "").strip()
+    schedule_update_template_id = (os.environ.get("WX_TMPL_SCHEDULE_UPDATE") or "").strip()
+    event_reminder_template_id = (os.environ.get("WX_TMPL_EVENT_REMINDER") or "").strip()
+    print("approval_result_template_id:", approval_result_template_id)
+    print("schedule_update_template_id:", schedule_update_template_id)
+    print("event_reminder_template_id:", event_reminder_template_id)
     return {
         "approval_result_template_id": (os.environ.get("WX_TMPL_APPROVAL_RESULT") or "").strip(),
         "schedule_update_template_id": (os.environ.get("WX_TMPL_SCHEDULE_UPDATE") or "").strip(),
