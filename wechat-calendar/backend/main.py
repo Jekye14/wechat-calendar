@@ -254,7 +254,8 @@ def login(body: schemas.LoginRequest, x_wx_openid: str = Header(default=None)):
 @app.put("/auth/profile")
 def update_profile(body: schemas.UpdateProfileRequest, user=Depends(get_current_user)):
     db.update_user(user["id"], body.nick_name, body.avatar_url)
-    return {"ok": True}
+    updated = db.get_user_by_id(user["id"])
+    return {"ok": True, "user": updated}
 
 # ── 日历 ──────────────────────────────────────────────────────────
 

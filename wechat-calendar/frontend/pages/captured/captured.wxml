@@ -1,17 +1,17 @@
 <view class="page">
-  <view class="nav-title">通知消息捕获</view>
-  <view wx:if="{{loading}}" class="empty">加载中...</view>
-  <view wx:elif="{{list.length===0}}" class="empty">暂无待处理捕获通知</view>
+  <view class="nav-title">{{t.nav.capturedTitle}}</view>
+  <view wx:if="{{loading}}" class="empty">{{t.common.loading}}</view>
+  <view wx:elif="{{list.length===0}}" class="empty">{{t.captured.noCaptures}}</view>
   <view wx:else class="list">
     <view class="card" wx:for="{{list}}" wx:key="id">
-      <view class="title">{{item.title || '未命名通知'}}</view>
-      <view class="meta">来源：{{item.package_name}}</view>
-      <view class="meta">收到时间：{{item.received_at}}</view>
-      <view wx:if="{{item.suggested_start_time}}" class="meta">建议时间：{{item.suggested_start_time}} ~ {{item.suggested_end_time}}</view>
+      <view class="title">{{item.title || t.captured.unnamed}}</view>
+      <view class="meta">{{t.captured.source}}{{item.package_name}}</view>
+      <view class="meta">{{t.captured.receivedAt}}{{item.received_at}}</view>
+      <view wx:if="{{item.suggested_start_time}}" class="meta">{{t.captured.suggestedTime}}{{item.suggested_start_time}} ~ {{item.suggested_end_time}}</view>
       <view class="text">{{item.text}}</view>
       <view class="actions">
-        <view class="btn primary" bindtap="createFromCaptured" data-id="{{item.id}}">创建日程</view>
-        <view class="btn danger" bindtap="dismissItem" data-id="{{item.id}}">忽略</view>
+        <view class="btn primary" bindtap="createFromCaptured" data-id="{{item.id}}">{{t.captured.createEvent}}</view>
+        <view class="btn danger" bindtap="dismissItem" data-id="{{item.id}}">{{t.captured.ignore}}</view>
       </view>
     </view>
   </view>

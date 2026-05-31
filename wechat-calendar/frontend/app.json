@@ -7,7 +7,8 @@
     "pages/event-detail/event-detail",
     "pages/join/join",
     "pages/notification/notification",
-    "pages/assigned-event/assigned-event"
+    "pages/assigned-event/assigned-event",
+    "pages/profile/profile"
   ],
   "window": {
     "backgroundTextStyle": "light",

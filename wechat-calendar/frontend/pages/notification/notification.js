@@ -1,5 +1,6 @@
 // pages/notification/notification.js
 const app = getApp()
+const i18n = require('../../utils/i18n')
 
 Page({
   data: {
@@ -7,13 +8,18 @@ Page({
     loading: true,
     subscribeConfig: null,
     subscribeStatusMap: {},
-    subscribeStatusText: '未开启',
+    subscribeStatusText: '',
     subscribeStatusClass: 'status-off',
-    subscribeButtonText: '开启审批通知',
+    subscribeButtonText: '',
     subscribeLoading: false,
+    t: {},
   },
 
-  onLoad() { this.load() },
+  onLoad() {
+    this.setData({ t: i18n.getLocale() }, () => {
+      this.load()
+    })
+  },
   onShow() { this.load() },
 
   load() {
@@ -28,36 +34,36 @@ Page({
     ]).then(([config, statusRes]) => {
       this.updateSubscribeStatus(config, statusRes.status || {})
     }).catch(() => {
+      const t = this.data.t
       this.setData({
         subscribeConfig: null,
-        subscribeStatusText: '未开启',
+        subscribeStatusText: t.notification.notSubscribed,
         subscribeStatusClass: 'status-off',
-        subscribeButtonText: '开启审批通知',
+        subscribeButtonText: t.notification.openSubscribe,
       })
     })
   },
 
   updateSubscribeStatus(config, statusMap) {
+    const t = this.data.t
     const tmplIds = [
       config && config.approval_result_template_id,
       config && config.schedule_update_template_id,
       config && config.event_reminder_template_id,
     ].filter(Boolean)
-    // console.log("updateSubscribeStatus: " + config)
-    // console.log("updateSubscribeStatus: " + tmplIds)
     const states = tmplIds.map(id => statusMap[id] || 'unknown')
 
-    let subscribeStatusText = '未开启'
+    let subscribeStatusText = t.notification.notSubscribed
     let subscribeStatusClass = 'status-off'
-    let subscribeButtonText = '开启审批通知'
+    let subscribeButtonText = t.notification.openSubscribe
     if (tmplIds.length > 0 && states.every(state => state === 'accept')) {
-      subscribeStatusText = '已开启'
+      subscribeStatusText = t.notification.subscribed
       subscribeStatusClass = 'status-on'
-      subscribeButtonText = '重新授权'
+      subscribeButtonText = t.notification.reauthorize
     } else if (states.some(state => state === 'reject' || state === 'ban')) {
-      subscribeStatusText = '需重新授权'
+      subscribeStatusText = t.notification.needReauthorize
       subscribeStatusClass = 'status-warn'
-      subscribeButtonText = '重新授权'
+      subscribeButtonText = t.notification.reauthorize
     }
 
     this.setData({
@@ -84,6 +90,7 @@ Page({
 
   requestSubscribe() {
     const config = this.data.subscribeConfig
+    const t = this.data.t
     const tmplIds = [
       config && config.approval_result_template_id,
       config && config.schedule_update_template_id,
@@ -91,7 +98,7 @@ Page({
     ].filter(Boolean)
 
     if (!tmplIds.length) {
-      wx.showToast({ title: '模板未配置', icon: 'none' })
+      wx.showToast({ title: t.notification.templateNotConfigured, icon: 'none' })
       return
     }
 
@@ -122,10 +129,10 @@ Page({
           // 完全一致：弹窗不会出现，引导去设置页
           this.setData({ subscribeLoading: false })
           wx.showModal({
-            title: '管理订阅消息',
-            content: '您已授权过订阅消息且设置未变更。要修改设置，请前往小程序设置页面的「订阅消息」进行管理。',
-            confirmText: '前往设置',
-            cancelText: '取消',
+            title: t.notification.manageTitle,
+            content: t.notification.manageDesc,
+            confirmText: t.notification.goToSettings,
+            cancelText: t.common.cancel,
             success: (modalRes) => {
               if (modalRes.confirm) {
                 wx.openSetting({
@@ -147,7 +154,7 @@ Page({
         }).finally(() => {
           this.setData({ subscribeLoading: false })
           this.loadSubscribeStatus()
-          wx.showToast({ title: '授权结果已更新', icon: 'none' })
+          wx.showToast({ title: t.notification.authUpdated, icon: 'none' })
         })
       },
       fail: (err) => {
@@ -157,10 +164,10 @@ Page({
         // 20004: 微信订阅消息总开关被关闭
         if (err && err.errCode === 20004) {
           wx.showModal({
-            title: '订阅消息已关闭',
-            content: '您已关闭微信的订阅消息总开关，无法弹出授权窗口。请前往小程序设置页面打开「订阅消息」开关后再试。',
-            confirmText: '前往设置',
-            cancelText: '取消',
+            title: t.notification.subscribeClosed,
+            content: t.notification.subscribeClosedDesc,
+            confirmText: t.notification.goToSettings,
+            cancelText: t.common.cancel,
             success: (modalRes) => {
               if (modalRes.confirm) {
                 wx.openSetting({
@@ -172,7 +179,7 @@ Page({
           return
         }
 
-        wx.showToast({ title: err?.errMsg || '订阅授权未完成', icon: 'none' })
+        wx.showToast({ title: err?.errMsg || t.notification.authNotComplete, icon: 'none' })
       },
     })
   },

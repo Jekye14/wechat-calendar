@@ -1,5 +1,6 @@
 // pages/calendar/calendar.js  ── 周视图日历
 const app = getApp()
+const i18n = require('../../utils/i18n')
 
 // 每个用户分配一个固定颜色（创建者用特殊色，成员按顺序分配）
 const MEMBER_COLORS = [
@@ -21,6 +22,7 @@ const HOUR_HEIGHT = 100
 
 Page({
   data: {
+    t: {},
     calId: null,
     calendar: null,
     members: [],
@@ -41,6 +43,8 @@ Page({
   },
 
   onLoad(options) {
+    const t = i18n.getLocale()
+    this.setData({ t })
     const calId = parseInt(options.id)
     const userId = app.globalData.userInfo && app.globalData.userInfo.id
     this.setData({ calId, currentUserId: userId })
@@ -123,7 +127,7 @@ Page({
       const dateStr = this.fmt(d)
       weekDays.push({
         dateStr,
-        label: ['一','二','三','四','五','六','日'][i],
+        label: this.data.t.weekDays[i],
         dayNum: d.getDate(),
         isToday: dateStr === today,
       })
@@ -280,14 +284,14 @@ Page({
       console.log('invite-token response:', data)   // <— 加这一行
       app.globalData.inviteToken = data.token
       wx.showShareMenu({ withShareTicket: true })
-      wx.showToast({ title: '请点击右上角分享', icon: 'none' })
+      wx.showToast({ title: this.data.t.calendar.shareTip, icon: 'none' })
     })
   },
 
   onShareAppMessage() {
     const token = app.globalData.inviteToken || ''
     return {
-      title: `邀请你加入日历「${this.data.calendar && this.data.calendar.name}」`,
+      title: this.data.t.calendar.inviteTitle.replace('{{name}}', this.data.calendar && this.data.calendar.name),
       path: `/pages/join/join?token=${token}`,
     }
   },
@@ -296,15 +300,15 @@ Page({
     const memberId = e.currentTarget.dataset.id
     const memberName = e.currentTarget.dataset.name
     wx.showModal({
-      title: '移除成员',
-      content: `确认移除成员「${memberName}」？`,
+      title: this.data.t.calendar.removeMemberTitle,
+      content: this.data.t.calendar.removeMemberConfirm.replace('{{name}}', memberName),
       success: (res) => {
         if (res.confirm) {
           app.request({
             url: `/calendars/${this.data.calId}/members/${memberId}`,
             method: 'DELETE'
           }).then(() => {
-            wx.showToast({ title: '已移除' })
+            wx.showToast({ title: this.data.t.calendar.removed })
             this.loadCalendar()
           })
         }
@@ -314,8 +318,8 @@ Page({
 
   deleteCalendar() {
     wx.showModal({
-      title: '删除日历',
-      content: '删除后所有事件将丢失，确认删除？',
+      title: this.data.t.calendar.deleteCalendarTitle,
+      content: this.data.t.calendar.deleteCalendarConfirm,
       success: (res) => {
         if (res.confirm) {
           app.request({

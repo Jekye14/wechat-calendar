@@ -1,5 +1,6 @@
 // pages/event/event.js  ── 创建/编辑普通事件
 const app = getApp()
+const i18n = require('../../utils/i18n')
 
 Page({
   data: {
@@ -15,41 +16,45 @@ Page({
     endTime: '10:00',
     location: '',
     content: '',
-    remindOptions: [
-      { label: '不提醒', value: 'null' },
-      { label: '到点提醒(0分钟)', value: '0' },
-      { label: '提前5分钟', value: '5' },
-      { label: '提前10分钟', value: '10' },
-      { label: '提前15分钟', value: '15' },
-      { label: '提前30分钟', value: '30' },
-      { label: '提前60分钟', value: '60' },
-    ],
+    remindOptions: [],
     remindOptionIndex: 3,
     remindSubscribeHint: true,
     calendars: [],
     selectedCalendarIds: [],
     submitting: false,
+    t: {},
   },
 
   onLoad(options) {
+    const t = i18n.getLocale()
+    const remindOptions = [
+      { label: t.event.noReminder, value: 'null' },
+      { label: t.event.remind0, value: '0' },
+      { label: t.event.remind5, value: '5' },
+      { label: t.event.remind10, value: '10' },
+      { label: t.event.remind15, value: '15' },
+      { label: t.event.remind30, value: '30' },
+      { label: t.event.remind60, value: '60' },
+    ]
     const calId = options.calId ? parseInt(options.calId) : null
     const eventId = options.eventId ? parseInt(options.eventId) : null
     const fromCaptured = options.fromCaptured === '1'
     const capturedId = options.capturedId ? parseInt(options.capturedId) : null
     this.setData({
       calId, eventId, isEdit: !!eventId, fromCaptured, capturedId,
-    })
-    wx.setNavigationBarTitle({ title: eventId ? '编辑事件' : '创建事件' })
+      t, remindOptions,
+    }, () => {
+      const selectedCalendarIds = calId ? [String(calId)] : []
+      this.loadCalendars(selectedCalendarIds, () => {
+        if (!eventId && !fromCaptured) {
+          this.setData({ ...this.getDefaultTimeRange() })
+        }
+      })
 
-    const selectedCalendarIds = calId ? [String(calId)] : []
-    this.loadCalendars(selectedCalendarIds, () => {
-      if (!eventId && !fromCaptured) {
-        this.setData({ ...this.getDefaultTimeRange() })
-      }
+      if (eventId) this.loadEvent(eventId)
+      if (fromCaptured && capturedId) this.loadCaptured(capturedId)
     })
-
-    if (eventId) this.loadEvent(eventId)
-    if (fromCaptured && capturedId) this.loadCaptured(capturedId)
+    wx.setNavigationBarTitle({ title: eventId ? t.nav.editEvent : t.nav.createEvent })
   },
 
   parseTime(dtStr) {
@@ -119,7 +124,7 @@ Page({
     app.request({ url: '/captured-notifications' }).then(list => {
       const captured = (list || []).find(item => item.id === capturedId)
       if (!captured) {
-        wx.showToast({ title: '捕获记录不存在', icon: 'none' })
+        wx.showToast({ title: this.data.t.event.captureNotFound || '捕获记录不存在', icon: 'none' })
         return
       }
       const defaults = this.getDefaultTimeRange()
@@ -186,10 +191,13 @@ Page({
   showBatchResult(result) {
     const failed = (result.results || []).filter(r => !r.ok)
     if (!failed.length) return Promise.resolve()
-    const lines = failed.map(r => `日历 ${r.calendar_name} 创建失败：${r.error || '未知错误'}`)
+    const t = this.data.t
+    const calCreateFailed = t.event.calendarCreateFailed || '日历 {{name}} 创建失败：{{reason}}'
+    const unknownError = t.event.unknownError || '未知错误'
+    const lines = failed.map(r => calCreateFailed.replace('{{name}}', r.calendar_name).replace('{{reason}}', r.error || unknownError))
     return new Promise(resolve => {
       wx.showModal({
-        title: '部分创建失败',
+        title: t.event.createFailed || '部分创建失败',
         content: lines.join('\n'),
         showCancel: false,
         success: () => resolve()
@@ -200,19 +208,19 @@ Page({
   submit() {
     const {
       title, startDate, startTime, endDate, endTime, location, content,
-      calId, eventId, isEdit, fromCaptured, capturedId, submitting, selectedCalendarIds, remindOptionIndex
+      calId, eventId, isEdit, fromCaptured, capturedId, submitting, selectedCalendarIds, remindOptionIndex, t
     } = this.data
     console.log('SUBMIT', Date.now())
     if (submitting) return
-    if (!title.trim()) return wx.showToast({ title: '请输入主题', icon: 'none' })
-    if (!startDate || !endDate) return wx.showToast({ title: '请选择时间', icon: 'none' })
+    if (!title.trim()) return wx.showToast({ title: t.event.pleaseEnterTitle, icon: 'none' })
+    if (!startDate || !endDate) return wx.showToast({ title: t.event.pleaseSelectTime, icon: 'none' })
 
     const startFull = `${startDate} ${startTime}:00`
     const endFull   = `${endDate} ${endTime}:00`
     const remindBeforeMinutes = this.getRemindBeforeMinutes(remindOptionIndex)
-    if (startFull >= endFull) return wx.showToast({ title: '结束时间须晚于开始时间', icon: 'none' })
+    if (startFull >= endFull) return wx.showToast({ title: t.event.endBeforeStart, icon: 'none' })
     if (!isEdit && (!selectedCalendarIds || selectedCalendarIds.length === 0)) {
-      return wx.showToast({ title: '请至少选择一个日历', icon: 'none' })
+      return wx.showToast({ title: t.event.pleaseSelectCalendar, icon: 'none' })
     }
 
     this.setData({ submitting: true })
@@ -230,7 +238,7 @@ Page({
         }
       }).then((res) => {
         app.sendSubscribePayloads(res.subscribe_to_send_list)
-        wx.showToast({ title: '修改成功' })
+        wx.showToast({ title: t.event.modifySuccess })
         setTimeout(() => wx.navigateBack(), 1200)
       }).catch(() => this.setData({ submitting: false }))
       return
@@ -255,7 +263,7 @@ Page({
       app.sendSubscribePayloads(result.subscribe_to_send_list)
       this.showBatchResult(result).then(() => {
         if (result.all_ok) {
-          wx.showToast({ title: fromCaptured ? '创建并确认成功' : '创建成功' })
+          wx.showToast({ title: fromCaptured ? t.event.createConfirmSuccess : t.event.createSuccess })
           setTimeout(() => wx.navigateBack(), 1200)
         } else {
           this.setData({ submitting: false })

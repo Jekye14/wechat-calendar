@@ -1,0 +1,35 @@
+<view class="container">
+  <view class="profile-card">
+    <!-- 头像 -->
+    <view class="avatar-section">
+      <button class="avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar">
+        <image class="avatar" src="{{avatarUrl || '/images/default-avatar.png'}}" mode="aspectFill" />
+        <text class="avatar-hint">{{t.profile.tapToChangeAvatar}}</text>
+      </button>
+    </view>
+
+    <!-- 昵称 -->
+    <view class="nickname-section">
+      <view class="label">{{t.profile.nickname}}</view>
+      <input
+        class="nickname-input"
+        type="nickname"
+        value="{{nickName}}"
+        placeholder="{{t.profile.nicknamePlaceholder}}"
+        bindinput="onNickNameInput"
+      />
+    </view>
+
+    <!-- 使用微信信息提示 -->
+    <view class="wechat-hint">
+      <text>{{t.profile.useWechatInfo}}</text>
+    </view>
+  </view>
+
+  <!-- 保存按钮 -->
+  <view class="save-section">
+    <button class="save-btn" bindtap="onSave" loading="{{saving}}" disabled="{{saving}}">
+      {{saving ? t.common.saving : t.profile.saveProfile}}
+    </button>
+  </view>
+</view>

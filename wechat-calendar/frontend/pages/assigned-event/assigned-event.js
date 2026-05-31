@@ -1,5 +1,6 @@
 // pages/assigned-event/assigned-event.js  ── 创建指派事件（仅创建者）
 const app = getApp()
+const i18n = require('../../utils/i18n')
 
 Page({
   data: {
@@ -14,14 +15,23 @@ Page({
     location: '',
     content: '',
     submitting: false,
+    t: {},
+    assignMembersText: '',
   },
 
   onLoad(options) {
+    const t = i18n.getLocale()
     const calId = parseInt(options.calId)
     const date = options.date || this.todayStr()
-    this.setData({ calId, startDate: date, endDate: date })
-    wx.setNavigationBarTitle({ title: '创建指派事件' })
+    this.setData({ calId, startDate: date, endDate: date, t, assignMembersText: this.formatAssignMembersText(0) })
+    wx.setNavigationBarTitle({ title: t.nav.createAssignedEvent })
     this.loadMembers()
+  },
+
+  formatAssignMembersText(count) {
+    const t = this.data.t
+    const template = t.event.assignMembers || '选择指派成员 *（已选 {{count}} 人）'
+    return template.replace('{{count}}', count)
   },
 
   loadMembers() {
@@ -36,7 +46,11 @@ Page({
     const members = this.data.members
     members[idx].selected = !members[idx].selected
     const selectedIds = members.filter(m => m.selected).map(m => m.id)
-    this.setData({ members, selectedIds })
+    this.setData({
+      members,
+      selectedIds,
+      assignMembersText: this.formatAssignMembersText(selectedIds.length),
+    })
   },
 
   onTitleInput(e)    { this.setData({ title: e.detail.value }) },
@@ -48,15 +62,15 @@ Page({
   onEndTimeChange(e)   { this.setData({ endTime: e.detail.value }) },
 
   submit() {
-    const { title, startDate, startTime, endDate, endTime, location, content, calId, selectedIds, submitting } = this.data
+    const { title, startDate, startTime, endDate, endTime, location, content, calId, selectedIds, submitting, t } = this.data
     if (submitting) return
-    if (!title.trim()) return wx.showToast({ title: '请输入主题', icon: 'none' })
-    if (!startDate || !endDate) return wx.showToast({ title: '请选择时间', icon: 'none' })
-    if (selectedIds.length === 0) return wx.showToast({ title: '请至少选择一名成员', icon: 'none' })
+    if (!title.trim()) return wx.showToast({ title: t.event.pleaseEnterTitle, icon: 'none' })
+    if (!startDate || !endDate) return wx.showToast({ title: t.event.pleaseSelectTime, icon: 'none' })
+    if (selectedIds.length === 0) return wx.showToast({ title: t.event.pleaseSelectMember, icon: 'none' })
 
     const startFull = `${startDate} ${startTime}:00`
     const endFull   = `${endDate} ${endTime}:00`
-    if (startFull >= endFull) return wx.showToast({ title: '结束时间须晚于开始时间', icon: 'none' })
+    if (startFull >= endFull) return wx.showToast({ title: t.event.endBeforeStart, icon: 'none' })
 
     this.setData({ submitting: true })
     app.request({
@@ -71,7 +85,7 @@ Page({
         assigned_member_ids: selectedIds,
       }
     }).then(() => {
-      wx.showToast({ title: '指派事件已创建并通知成员' })
+      wx.showToast({ title: t.event.assignedCreated })
       setTimeout(() => wx.navigateBack(), 1500)
     }).catch(() => this.setData({ submitting: false }))
   },

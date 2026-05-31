@@ -1,5 +1,6 @@
 // pages/event-detail/event-detail.js  ── 事件详情/审批
 const app = getApp()
+const i18n = require('../../utils/i18n')
 
 Page({
   data: {
@@ -15,12 +16,16 @@ Page({
     rejectReason: '',
     showRejectDeletionModal: false,
     rejectDeletionReason: '',
+    t: {},
+    updateApprovalDescText: '',
   },
 
   onLoad(options) {
+    const t = i18n.getLocale()
     this.setData({
       calId: options.calId ? parseInt(options.calId, 10) : null,
       eventId: parseInt(options.eventId || options.id, 10),
+      t,
     })
     this.loadEvent()
   },
@@ -55,6 +60,15 @@ Page({
       if (event.pending_revision) {
         event.pending_revision.created_at_text = formatDateTime(event.pending_revision.created_at)
       }
+      // 生成修改审批描述文本
+      const t = this.data.t
+      let updateApprovalDescText = ''
+      if (event.pending_revision) {
+        const template = t.detail.updateApprovalDesc || '成员「{{name}}」于 {{time}} 提交了修改'
+        updateApprovalDescText = template
+          .replace('{{name}}', event.pending_revision.editor_name || '')
+          .replace('{{time}}', event.pending_revision.created_at_text || '')
+      }
       const userId = app.globalData.userInfo && app.globalData.userInfo.id
       this.setData({
         calId: event.calendar_id,
@@ -64,6 +78,7 @@ Page({
         isDeleted: false,
         isCreator: cal.creator_id === userId,
         isEventOwner: event.creator_id === userId,
+        updateApprovalDescText,
       })
       wx.setNavigationBarTitle({ title: event.title })
     }).catch((err) => {
@@ -76,7 +91,7 @@ Page({
           isCreator: false,
           isEventOwner: false,
         })
-        wx.setNavigationBarTitle({ title: '事件详情' })
+        wx.setNavigationBarTitle({ title: this.data.t.nav.eventDetail })
         return
       }
       this.setData({ loading: false })
@@ -87,9 +102,10 @@ Page({
     const status = this.data.event && this.data.event.status
     const isUpdatePending = status === 'update_pending'
     const isDeletePending = status === 'delete_pending'
+    const t = this.data.t
     wx.showModal({
-      title: '确认审批',
-      content: isUpdatePending ? '确认通过该修改？' : isDeletePending ? '确认同意删除该事件？' : '确认通过该事件？',
+      title: t.detail.approveTitle,
+      content: isUpdatePending ? t.detail.approveUpdate : isDeletePending ? t.detail.approveDelete : t.detail.approveNew,
       success: (res) => {
         if (res.confirm) {
           app.request({
@@ -97,7 +113,7 @@ Page({
             method: 'POST',
           }).then((res) => {
             app.sendSubscribePayloads(res.subscribe_to_send_list)
-            wx.showToast({ title: '已通过' })
+            wx.showToast({ title: t.detail.approved })
             this.load()
           })
         }
@@ -117,7 +133,7 @@ Page({
     }).then((res) => {
       app.sendSubscribePayloads(res.subscribe_to_send_list)
       this.setData({ showRejectModal: false })
-      wx.showToast({ title: '已拒绝' })
+      wx.showToast({ title: this.data.t.detail.rejected })
       this.load()
     })
   },
@@ -128,9 +144,10 @@ Page({
     })
   },
   approveDeletion() {
+    const t = this.data.t
     wx.showModal({
-      title: '确认同意删除',
-      content: '确认同意该成员删除此事件？',
+      title: t.detail.deleteApproveTitle,
+      content: t.detail.deleteApproveConfirm,
       success: (res) => {
         if (res.confirm) {
           app.request({
@@ -138,7 +155,7 @@ Page({
             method: 'POST',
           }).then((res) => {
             app.sendSubscribePayloads(res.subscribe_to_send_list)
-            wx.showToast({ title: '已同意删除' })
+            wx.showToast({ title: t.detail.deleteApproved })
             this.load()
           })
         }
@@ -166,7 +183,7 @@ Page({
     }).then((res) => {
       app.sendSubscribePayloads(res.subscribe_to_send_list)
       this.setData({ showRejectDeletionModal: false })
-      wx.showToast({ title: '已驳回' })
+      wx.showToast({ title: this.data.t.detail.rejected2 })
       this.load()
     })
   },
@@ -174,15 +191,16 @@ Page({
     const { event } = this.data
     const isCreator = this.data.isCreator
     const isEventOwner = this.data.isEventOwner
+    const t = this.data.t
     
     // 判断是否需要审批
     const needsApproval = !isCreator && event.status !== 'rejected'
     const contentMsg = needsApproval 
-      ? '删除需要创建者审批，确认提交删除申请？' 
-      : '确认删除该事件？'
+      ? t.detail.deleteNeedApproval
+      : t.detail.deleteConfirm
     
     wx.showModal({
-      title: '删除事件',
+      title: t.detail.deleteEventTitle,
       content: contentMsg,
       success: (res) => {
         if (res.confirm) {
@@ -191,7 +209,7 @@ Page({
             method: 'DELETE'
           }).then((response) => {
             app.sendSubscribePayloads(response.subscribe_to_send_list)
-            const msg = needsApproval ? '删除申请已提交，等待创建者审批' : '删除成功'
+            const msg = needsApproval ? t.detail.deleteSubmitted : t.detail.deleteSuccess
             wx.showToast({ title: msg })
             setTimeout(() => wx.navigateBack(), 1000)
           })

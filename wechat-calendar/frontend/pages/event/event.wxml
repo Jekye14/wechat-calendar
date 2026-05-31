@@ -2,16 +2,16 @@
 <view class="page">
   <view class="form-card">
     <view class="field">
-      <text class="label required">主题</text>
-      <input class="input" placeholder="请输入事件主题" value="{{title}}" bindinput="onTitleInput"/>
+      <text class="label required">{{t.event.title}}</text>
+      <input class="input" placeholder="{{t.event.titlePlaceholder}}" value="{{title}}" bindinput="onTitleInput"/>
     </view>
     <view class="divider"></view>
 
     <view class="field">
-      <text class="label required">开始时间</text>
+      <text class="label required">{{t.event.startTime}}</text>
       <view class="datetime-row">
         <picker mode="date" value="{{startDate}}" bindchange="onStartDateChange">
-          <view class="picker-box">{{startDate || '选择日期'}}</view>
+          <view class="picker-box">{{startDate || t.event.pickDate}}</view>
         </picker>
         <picker mode="time" value="{{startTime}}" bindchange="onStartTimeChange">
           <view class="picker-box">{{startTime}}</view>
@@ -21,10 +21,10 @@
     <view class="divider"></view>
 
     <view class="field">
-      <text class="label required">结束时间</text>
+      <text class="label required">{{t.event.endTime}}</text>
       <view class="datetime-row">
         <picker mode="date" value="{{endDate}}" bindchange="onEndDateChange">
-          <view class="picker-box">{{endDate || '选择日期'}}</view>
+          <view class="picker-box">{{endDate || t.event.pickDate}}</view>
         </picker>
         <picker mode="time" value="{{endTime}}" bindchange="onEndTimeChange">
           <view class="picker-box">{{endTime}}</view>
@@ -34,18 +34,18 @@
     <view class="divider"></view>
 
     <view class="field">
-      <text class="label">地点</text>
-      <input class="input" placeholder="选填" value="{{location}}" bindinput="onLocationInput"/>
+      <text class="label">{{t.event.location}}</text>
+      <input class="input" placeholder="{{t.event.locationPlaceholder}}" value="{{location}}" bindinput="onLocationInput"/>
     </view>
     <view class="divider"></view>
 
     <view class="field">
-      <text class="label">内容</text>
-      <textarea class="textarea" placeholder="选填，填写事件详细内容" value="{{content}}" bindinput="onContentInput"/>
+      <text class="label">{{t.event.content}}</text>
+      <textarea class="textarea" placeholder="{{t.event.contentPlaceholder}}" value="{{content}}" bindinput="onContentInput"/>
     </view>
     <view class="divider"></view>
 
-    <view class="field">
+    <!-- <view class="field">
       <text class="label">提醒时间</text>
       <picker mode="selector" range="{{remindOptions}}" range-key="label" value="{{remindOptionIndex}}" bindchange="onRemindChange">
         <view class="picker-box">{{remindOptions[remindOptionIndex].label}}</view>
@@ -54,10 +54,10 @@
         提醒依赖订阅消息授权，可在「通知」页开启/更新授权
       </view>
     </view>
-    <view class="divider" wx:if="{{!isEdit}}"></view>
+    <view class="divider" wx:if="{{!isEdit}}"></view> -->
 
     <view class="field" wx:if="{{!isEdit}}">
-      <text class="label required">选择日历（可多选，在日历界面创建时不选默认当前日历）</text>
+      <text class="label required">{{t.event.selectCalendars}}</text>
       <!-- <checkbox-group bindchange="onCalendarChange">
         <view class="cal-option" wx:for="{{calendars}}" wx:key="id">
           <checkbox value="{{item.idStr}}" checked="{{selectedCalendarIds.indexOf(item.idStr) >= 0}}" />
@@ -82,10 +82,10 @@
     </view>
   </view>
 
-  <view class="tip" wx:if="{{!fromCaptured}}">注：成员创建的事件需创建者（导师）审批后生效，且不能与创建者事件时间冲突。</view>
-  <view class="tip" wx:if="{{fromCaptured}}">从捕获通知创建：默认不勾选日历，请至少选择一个。</view>
+  <view class="tip" wx:if="{{!fromCaptured}}">{{t.event.memberNote}}</view>
+  <view class="tip" wx:if="{{fromCaptured}}">{{t.event.capturedNote}}</view>
 
   <view class="submit-btn {{submitting?'disabled':''}}" bindtap="submit">
-    {{submitting ? '提交中...' : (isEdit ? '保存修改' : '提交事件')}}
+    {{submitting ? t.event.submitting : (isEdit ? t.event.saveEdit : t.event.submitEvent)}}
   </view>
 </view>

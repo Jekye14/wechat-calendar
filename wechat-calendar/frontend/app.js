@@ -3,6 +3,7 @@ App({
   globalData: {
     openid: '',
     userInfo: null,
+    lang: 'zh',  // 默认中文，onLaunch 中根据微信语言自动检测
 
     // 云托管配置
     cloudEnv: 'prod-0g6c5yfpa326bfaf',
@@ -14,6 +15,11 @@ App({
   },
 
   onLaunch() {
+    // 检测微信语言并设置全局语言
+    const appBaseInfo = wx.getAppBaseInfo ? wx.getAppBaseInfo() : {}
+    const wxLang = (appBaseInfo.language || '').toLowerCase()
+    this.globalData.lang = wxLang.startsWith('zh') ? 'zh' : 'en'
+
     // 新增：初始化云环境（只需要一次）
     wx.cloud.init({
       env: this.globalData.cloudEnv

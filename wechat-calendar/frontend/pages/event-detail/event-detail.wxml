@@ -1,15 +1,15 @@
 <!-- pages/event-detail/event-detail.wxml -->
 <view class="page">
-  <view wx:if="{{isDeleted}}" class="status-banner status-deleted">已删除</view>
+  <view wx:if="{{isDeleted}}" class="status-banner status-deleted">{{t.detail.statusDeleted}}</view>
   <block wx:elif="{{event}}">
     <!-- 状态横幅 -->
     <view class="status-banner status-{{event.status}} {{event.event_type=='assigned'?'status-assigned':''}}">
-      <text wx:if="{{event.event_type=='assigned'}}">📌 指派事件</text>
-      <text wx:elif="{{event.status=='pending'}}">⏳ 待审批</text>
-      <text wx:elif="{{event.status=='delete_pending'}}">🗑️ 删除待审批</text>
-      <text wx:elif="{{event.status=='update_pending'}}">✏️ 修改待审批</text>
-      <text wx:elif="{{event.status=='approved'}}">✅ 已通过</text>
-      <text wx:elif="{{event.status=='rejected'}}">❌ 已拒绝</text>
+      <text wx:if="{{event.event_type=='assigned'}}">{{t.detail.statusAssigned}}</text>
+      <text wx:elif="{{event.status=='pending'}}">{{t.detail.statusPending}}</text>
+      <text wx:elif="{{event.status=='delete_pending'}}">{{t.detail.statusDeletePending}}</text>
+      <text wx:elif="{{event.status=='update_pending'}}">{{t.detail.statusUpdatePending}}</text>
+      <text wx:elif="{{event.status=='approved'}}">{{t.detail.statusApproved}}</text>
+      <text wx:elif="{{event.status=='rejected'}}">{{t.detail.statusRejected}}</text>
     </view>
 
     <!-- 基本信息 -->
@@ -33,17 +33,17 @@
       </view>
       <view class="info-row">
         <text class="icon">👤</text>
-        <text class="info-val">创建者：{{event.creator_name}}</text>
+        <text class="info-val">{{t.detail.createdBy}}{{event.creator_name}}</text>
       </view>
       <view class="info-row">
         <text class="icon">🕓</text>
-        <text class="info-val">创建于 {{event.created_at_text}}</text>
+        <text class="info-val">{{t.detail.createdAt}}{{event.created_at_text}}</text>
       </view>
     </view>
 
     <!-- 指派成员 -->
     <view wx:if="{{event.event_type=='assigned' && event.assignees.length>0}}" class="card">
-      <view class="section-label">指派成员</view>
+      <view class="section-label">{{t.detail.assignees}}</view>
       <view class="assignee-list">
         <view class="assignee-item" wx:for="{{event.assignees}}" wx:key="id">
           <image class="assignee-avatar" src="{{item.avatar_url}}" mode="aspectFill"/>
@@ -54,67 +54,67 @@
 
     <!-- 创建者审批操作 -->
     <view wx:if="{{isCreator && event.status=='pending'}}" class="action-card">
-      <view class="action-title">审批操作</view>
+      <view class="action-title">{{t.detail.approvalAction}}</view>
       <view class="action-row">
-        <view class="btn-approve" bindtap="approveEvent">✔ 通过</view>
-        <view class="btn-reject"  bindtap="showReject">✘ 拒绝</view>
+        <view class="btn-approve" bindtap="approveEvent">{{t.detail.btnApprove}}</view>
+        <view class="btn-reject"  bindtap="showReject">{{t.detail.btnReject}}</view>
       </view>
     </view>
 
     <!-- 删除审批操作（创建者对delete_pending状态的事件） -->
     <view wx:if="{{isCreator && event.status=='delete_pending'}}" class="action-card">
-      <view class="action-title">删除审批</view>
-      <view class="section-desc">成员申请删除此事件</view>
+      <view class="action-title">{{t.detail.deleteApproval}}</view>
+      <view class="section-desc">{{t.detail.deleteApprovalDesc}}</view>
       <view class="action-row">
-        <view class="btn-approve" bindtap="approveDeletion">✔ 同意删除</view>
-        <view class="btn-reject" bindtap="showRejectDeletion">✘ 驳回</view>
+        <view class="btn-approve" bindtap="approveDeletion">{{t.detail.btnApproveDelete}}</view>
+        <view class="btn-reject" bindtap="showRejectDeletion">{{t.detail.btnRejectDelete}}</view>
       </view>
     </view>
 
     <!-- 删除审批驳回弹窗 -->
     <view class="modal-mask" wx:if="{{showRejectDeletionModal}}" bindtap="closeRejectDeletion">
       <view class="modal" catchtap="noop">
-        <view class="modal-title">拒绝删除</view>
-        <textarea class="reject-input" placeholder="选填，填写拒绝原因" value="{{rejectDeletionReason}}" bindinput="onRejectDeletionInput"/>
+        <view class="modal-title">{{t.detail.rejectReason}}</view>
+        <textarea class="reject-input" placeholder="{{t.detail.rejectReasonPlaceholder}}" value="{{rejectDeletionReason}}" bindinput="onRejectDeletionInput"/>
         <view class="modal-btns">
-          <view class="modal-btn cancel" bindtap="closeRejectDeletion">取消</view>
-          <view class="modal-btn reject" bindtap="rejectDeletion">确认驳回</view>
+          <view class="modal-btn cancel" bindtap="closeRejectDeletion">{{t.common.cancel}}</view>
+          <view class="modal-btn reject" bindtap="rejectDeletion">{{t.detail.btnRejectDelete2}}</view>
         </view>
       </view>
     </view>
 
     <!-- 修改审批操作（创建者对 update_pending 状态） -->
     <view wx:if="{{isCreator && event.status=='update_pending'}}" class="action-card">
-      <view class="action-title">修改审批</view>
+      <view class="action-title">{{t.detail.updateApproval}}</view>
       <view wx:if="{{event.pending_revision}}" class="section-desc">
-        成员「{{event.pending_revision.editor_name}}」于 {{event.pending_revision.created_at_text}} 提交了修改
+        {{updateApprovalDescText}}
       </view>
       <view class="action-row">
-        <view class="btn-approve" bindtap="approveEvent">✔ 通过修改</view>
-        <view class="btn-reject" bindtap="showReject">✘ 拒绝修改</view>
+        <view class="btn-approve" bindtap="approveEvent">{{t.detail.btnApproveUpdate}}</view>
+        <view class="btn-reject" bindtap="showReject">{{t.detail.btnRejectUpdate}}</view>
       </view>
     </view>
 
     <!-- 编辑/删除 -->
     <view class="action-card">
       <view wx:if="{{(isCreator || isEventOwner) && event.event_type!='assigned'}}"
-        class="btn-outline" bindtap="editEvent">编辑事件</view>
+        class="btn-outline" bindtap="editEvent">{{t.detail.editEvent}}</view>
       <view wx:if="{{isCreator || isEventOwner}}"
-        class="btn-danger-outline" bindtap="deleteEvent">删除事件</view>
+        class="btn-danger-outline" bindtap="deleteEvent">{{t.detail.deleteEvent}}</view>
     </view>
 
     <!-- 拒绝弹窗 -->
     <view class="modal-mask" wx:if="{{showRejectModal}}" bindtap="closeReject">
       <view class="modal" catchtap="noop">
-        <view class="modal-title">拒绝原因</view>
-        <textarea class="reject-input" placeholder="选填，填写拒绝原因" value="{{rejectReason}}" bindinput="onReasonInput"/>
+        <view class="modal-title">{{t.detail.rejectReasonTitle}}</view>
+        <textarea class="reject-input" placeholder="{{t.detail.rejectReasonPlaceholder}}" value="{{rejectReason}}" bindinput="onReasonInput"/>
         <view class="modal-btns">
-          <view class="modal-btn cancel" bindtap="closeReject">取消</view>
-          <view class="modal-btn reject" bindtap="rejectEvent">确认拒绝</view>
+          <view class="modal-btn cancel" bindtap="closeReject">{{t.common.cancel}}</view>
+          <view class="modal-btn reject" bindtap="rejectEvent">{{t.detail.btnConfirmReject}}</view>
         </view>
       </view>
     </view>
   </block>
 
-  <view wx:elif="{{loading}}" class="empty">加载中...</view>
+  <view wx:elif="{{loading}}" class="empty">{{t.common.loading}}</view>
 </view>
