@@ -131,17 +131,20 @@ def build_subscribe_payload_if_accepted(user_id: int, template_id: str, data: di
     }
 
 
-def notify_schedule_update_subscribe(target_user_id: int, cal: dict, event: dict, actor_name: str, action: str):
+def notify_schedule_update_subscribe(target_user_id: int, cal: dict, event: dict, actor_name: str, action: str, remark: str = None):
     template_id = get_subscribe_config()["schedule_update_template_id"]
     if not template_id:
         return None
+
+    if remark is None:
+        remark = f"{shorten_text(actor_name, 8, '成员')}{action}，待审批"
 
     data = {
         "thing1": {"value": shorten_text(event.get("title"), 20, "未命名日程")},
         "time2": {"value": format_subscribe_time(event.get("start_time"))},
         "thing3": {"value": shorten_text(event.get("location"), 20, "无")},
         "thing4": {"value": shorten_text(actor_name, 20, "成员")},
-        "thing5": {"value": shorten_text(f"{shorten_text(actor_name, 8, '成员')}{action}，待审批", 20)},
+        "thing5": {"value": shorten_text(remark, 20)},
     }
     return build_subscribe_payload_if_accepted(target_user_id, template_id, data, event["id"])
 
@@ -446,23 +449,49 @@ def update_event(cal_id: int, event_id: int, body: schemas.UpdateEventRequest, u
         for field in comparable_fields
     )
 
-    new_status = "pending" if (not is_creator and has_real_changes) else event["status"]
-
-    updated_event = db.update_event(event_id, body, new_status)
-    subscribe_to_send_list = []
-
+    # ── 成员修改：写入 event_revisions 表，不碰 events 表 ──
     if (not is_creator) and has_real_changes:
+        # 检查是否已有待审批的修改提案
+        existing_rev = db.get_pending_revision(event_id)
+        if existing_rev:
+            raise HTTPException(status_code=409, detail="该事件已有待审批的修改，请等待审批人处理")
+
+        db.create_event_revision(event_id, user["id"], body)
+        db.update_event_status(event_id, "update_pending")
+
+        subscribe_to_send_list = []
         db.create_notification(
             user_id=cal["creator_id"], type="update_request",
             title="事件更新通知",
-            content=f"成员「{user['nick_name']}」修改了事件「{updated_event['title']}」，待你审批。",
+            content=f"成员「{user['nick_name']}」修改了事件「{event['title']}」，待你审批。",
             ref_event_id=event_id, ref_cal_id=cal_id,
         )
         payload_to_send = notify_schedule_update_subscribe(
-            cal["creator_id"], cal, updated_event, user["nick_name"], "修改日程"
+            cal["creator_id"], cal, event, user["nick_name"], "修改日程"
         )
         if payload_to_send:
             subscribe_to_send_list.append(payload_to_send)
+
+        return {**event, "subscribe_to_send_list": subscribe_to_send_list}
+
+    # ── 创建者修改：直接更新 events 表 ─────────────────────
+    updated_event = db.update_event(event_id, body, event["status"])
+    subscribe_to_send_list = []
+
+    # 若被修改的日程创建者不是日历创建者，通知原创建者
+    if event["creator_id"] != user["id"]:
+        db.create_notification(
+            user_id=event["creator_id"], type="schedule_update",
+            title="日程更新通知",
+            content=f"日历「{cal['name']}」的创建者「{user['nick_name']}」修改了你的日程「{updated_event['title']}」。",
+            ref_event_id=event_id, ref_cal_id=cal_id,
+        )
+        payload = notify_schedule_update_subscribe(
+            event["creator_id"], cal, updated_event, user["nick_name"],
+            "创建者修改", remark="你的日程被创建者修改"
+        )
+        if payload:
+            subscribe_to_send_list.append(payload)
 
     return {**updated_event, "subscribe_to_send_list": subscribe_to_send_list}
 
@@ -488,7 +517,24 @@ def delete_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
     # 创建者可直接删除
     if is_creator:
         db.delete_event(event_id)
-        return {"ok": True, "message": "删除成功", "subscribe_to_send_list": []}
+        subscribe_to_send_list = []
+
+        # 若被删除的日程创建者不是日历创建者，通知原创建者
+        if event["creator_id"] != user["id"]:
+            db.create_notification(
+                user_id=event["creator_id"], type="schedule_update",
+                title="日程更新通知",
+                content=f"日历「{cal['name']}」的创建者「{user['nick_name']}」删除了你的日程「{event['title']}」。",
+                ref_event_id=event_id, ref_cal_id=cal_id,
+            )
+            payload = notify_schedule_update_subscribe(
+                event["creator_id"], cal, event, user["nick_name"],
+                "创建者删除", remark="你的日程被创建者删除"
+            )
+            if payload:
+                subscribe_to_send_list.append(payload)
+
+        return {"ok": True, "message": "删除成功", "subscribe_to_send_list": subscribe_to_send_list}
 
     # 新规则：未通过(rejected)事件，成员可直接删除，无需审批
     if event["status"] == "rejected":
@@ -539,6 +585,32 @@ def approve_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
             "subscribe_to_send_list": [payload_to_send] if payload_to_send else [],
         }
 
+    # 修改审批通过：将提案数据应用到 events 表
+    if event["status"] == "update_pending":
+        revision = db.get_pending_revision(event_id)
+        if not revision:
+            raise HTTPException(status_code=400, detail="未找到待审批的修改提案")
+
+        updated_event = db.apply_revision(event_id, revision)
+        editor = db.get_user_by_id(revision["editor_id"])
+        editor_name = editor["nick_name"] if editor else "成员"
+
+        db.create_notification(
+            user_id=revision["editor_id"], type="approved",
+            title="事件修改已通过",
+            content=f"你在「{cal['name']}」修改的事件「{updated_event['title']}」已通过审批。",
+            ref_event_id=event_id, ref_cal_id=cal_id,
+        )
+        payload_to_send = notify_approval_result_subscribe(
+            revision["editor_id"], cal, updated_event, "审批通过",
+            f"事件{updated_event['title']}修改审批通过"
+        )
+        return {
+            "ok": True,
+            "message": "修改已通过",
+            "subscribe_to_send_list": [payload_to_send] if payload_to_send else [],
+        }
+
     # 普通待审批通过
     if event["status"] != "pending":
         raise HTTPException(status_code=400, detail="事件不在可审批状态")
@@ -581,6 +653,32 @@ def reject_event(cal_id: int, event_id: int, body: schemas.RejectRequest, user=D
             event["creator_id"], cal, event, "审批驳回", f"事件{event['title']}删除审批驳回"
         )
         return {"ok": True, "message": "删除申请已驳回", "subscribe_to_send_list": [payload_to_send] if payload_to_send else []}
+
+    # 修改审批拒绝：丢弃提案，恢复事件状态（events 表数据不变）
+    if event["status"] == "update_pending":
+        revision = db.get_pending_revision(event_id)
+        if revision:
+            db.update_revision_status(revision["id"], "rejected")
+        db.update_event_status(event_id, "approved")
+
+        editor_id = revision["editor_id"] if revision else event["creator_id"]
+        editor = db.get_user_by_id(editor_id)
+        editor_name = editor["nick_name"] if editor else "成员"
+
+        db.create_notification(
+            user_id=editor_id, type="rejected",
+            title="事件修改未通过",
+            content=f"你在「{cal['name']}」修改的事件「{event['title']}」未通过。原因：{reason}",
+            ref_event_id=event_id, ref_cal_id=cal_id,
+        )
+        payload_to_send = notify_approval_result_subscribe(
+            editor_id, cal, event, "审批驳回", f"事件{event['title']}修改审批驳回"
+        )
+        return {
+            "ok": True,
+            "message": "修改已拒绝",
+            "subscribe_to_send_list": [payload_to_send] if payload_to_send else [],
+        }
 
     # 普通审批拒绝
     db.update_event_status(event_id, "rejected")

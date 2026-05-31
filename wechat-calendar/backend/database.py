@@ -217,6 +217,26 @@ def init_db():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """)
 
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS event_revisions (
+                id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                event_id BIGINT NOT NULL,
+                editor_id BIGINT NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                start_time VARCHAR(64) NOT NULL,
+                end_time VARCHAR(64) NOT NULL,
+                location VARCHAR(255) NOT NULL DEFAULT '',
+                content TEXT,
+                remind_before_minutes INT,
+                status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT fk_rev_event FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+                CONSTRAINT fk_rev_editor FOREIGN KEY (editor_id) REFERENCES users(id) ON DELETE CASCADE,
+                INDEX idx_revisions_event_status (event_id, status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """)
+
         conn.commit()
         _ensure_events_reminder_columns(conn)
 
@@ -479,6 +499,93 @@ def update_event_status(event_id: int, status: str):
             (status, event_id),
         )
         conn.commit()
+
+
+# ── 事件修改提案（event_revisions）────────────────────────────
+
+def create_event_revision(event_id: int, editor_id: int, body) -> dict:
+    """成员修改事件时，将修改内容写入 event_revisions 表，不碰 events 表"""
+    incoming = body.model_dump(exclude_unset=True) if hasattr(body, "model_dump") else body
+    with get_conn() as conn:
+        # 同一事件已有 pending 提案时覆盖（只保留最新一个）
+        existing = _fetchone(
+            conn,
+            "SELECT id FROM event_revisions WHERE event_id=%s AND status='pending' LIMIT 1",
+            (event_id,),
+        )
+        if existing:
+            _execute(conn, "DELETE FROM event_revisions WHERE id=%s", (existing["id"],))
+
+        new_id = _execute(conn, """
+            INSERT INTO event_revisions
+                (event_id, editor_id, title, start_time, end_time, location, content, remind_before_minutes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            event_id, editor_id,
+            incoming.get("title", ""),
+            incoming.get("start_time", ""),
+            incoming.get("end_time", ""),
+            incoming.get("location", ""),
+            incoming.get("content", ""),
+            incoming.get("remind_before_minutes"),
+        ))
+        conn.commit()
+        row = _fetchone(conn, "SELECT * FROM event_revisions WHERE id=%s", (new_id,))
+        return row_to_dict(row)
+
+
+def get_pending_revision(event_id: int) -> Optional[dict]:
+    """获取事件最新的待审批修改提案"""
+    with get_conn() as conn:
+        row = _fetchone(
+            conn,
+            "SELECT * FROM event_revisions WHERE event_id=%s AND status='pending' ORDER BY created_at DESC LIMIT 1",
+            (event_id,),
+        )
+        return row_to_dict(row)
+
+
+def update_revision_status(revision_id: int, status: str):
+    """更新提案状态（approved / rejected）"""
+    with get_conn() as conn:
+        _execute(
+            conn,
+            "UPDATE event_revisions SET status=%s, updated_at=CURRENT_TIMESTAMP WHERE id=%s",
+            (status, revision_id),
+        )
+        conn.commit()
+
+
+def apply_revision(event_id: int, revision: dict) -> dict:
+    """将修改提案的数据写入 events 表，同时标记提案为 approved"""
+    with get_conn() as conn:
+        _execute(conn, """
+            UPDATE events SET
+                title=%s,
+                start_time=%s,
+                end_time=%s,
+                location=%s,
+                content=%s,
+                remind_before_minutes=%s,
+                status='approved',
+                updated_at=CURRENT_TIMESTAMP
+            WHERE id=%s
+        """, (
+            revision["title"],
+            revision["start_time"],
+            revision["end_time"],
+            revision["location"] or "",
+            revision["content"] or "",
+            revision.get("remind_before_minutes"),
+            event_id,
+        ))
+        _execute(
+            conn,
+            "UPDATE event_revisions SET status='approved', updated_at=CURRENT_TIMESTAMP WHERE id=%s",
+            (revision["id"],),
+        )
+        conn.commit()
+        return _get_event_with_creator(conn, event_id)
 
 
 def delete_event(event_id: int):

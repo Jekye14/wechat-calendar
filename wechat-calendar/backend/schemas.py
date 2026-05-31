@@ -107,6 +107,22 @@ class Event(BaseModel):
 class RejectRequest(BaseModel):
     reason: Optional[str] = ""
 
+# ── 事件修改提案 ────────────────────────────────────────────
+
+class EventRevision(BaseModel):
+    id: int
+    event_id: int
+    editor_id: int
+    title: str
+    start_time: str
+    end_time: str
+    location: str
+    content: str
+    remind_before_minutes: Optional[int] = None
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
 # ── 通知 ────────────────────────────────────────────────────
 
 class Notification(BaseModel):
