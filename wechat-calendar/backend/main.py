@@ -372,7 +372,7 @@ def list_events(cal_id: int, user=Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="日历不存在")
     if not db.is_member_or_creator(cal_id, user["id"], cal["creator_id"]):
         raise HTTPException(status_code=403, detail="无权访问")
-    return db.get_calendar_events(cal_id)
+    return db.get_calendar_events_with_revisions(cal_id)
 @app.get("/calendars/{cal_id}/events/{event_id}", response_model=schemas.Event)
 def get_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
     cal = db.get_calendar(cal_id)
@@ -381,14 +381,10 @@ def get_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
     if not db.is_member_or_creator(cal_id, user["id"], cal["creator_id"]):
         raise HTTPException(status_code=403, detail="无权访问")
 
-    event = db.get_event(event_id)
+    event = db.get_event_with_revision(event_id)
     if not event or event["calendar_id"] != cal_id:
         raise HTTPException(status_code=404, detail="事件不存在")
-
-    # TODO 未来需要优化，现在调用了两次数据库搜索，一次 get_event 一次 update_event
-    # db.get_event 返回的字段可能不含 creator_name/assignees 等，
-    # 但前端事件详情页使用的是 schemas.Event，所以这里用 update_event 返回的完整结构保持一致：
-    return db.update_event(event_id, schemas.UpdateEventRequest(), event["status"])
+    return event
 
 
 @app.get("/events/{event_id}", response_model=schemas.Event)

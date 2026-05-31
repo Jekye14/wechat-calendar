@@ -196,7 +196,7 @@ Page({
           widthPct,
           zIndex,
           // 内联样式字符串
-          style: `top:${topRpx}rpx;height:${heightRpx}rpx;left:${leftPct.toFixed(3)}%;width:${widthPct.toFixed(3)}%;z-index:${zIndex};background:${ev.color};opacity:${ev.status==='rejected'?0.4:ev.status==='pending'?0.75:1}`,
+          style: `top:${topRpx}rpx;height:${heightRpx}rpx;left:${leftPct.toFixed(3)}%;width:${widthPct.toFixed(3)}%;z-index:${zIndex};background:${ev.color};opacity:${ev.status==='rejected'?0.4:ev.status==='pending'?0.75:ev.status==='update_pending'?0.75:ev.status==='delete_pending'?0.75:1}`,
         })
       })
     })

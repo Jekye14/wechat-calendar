@@ -7,6 +7,7 @@
       <text wx:if="{{event.event_type=='assigned'}}">📌 指派事件</text>
       <text wx:elif="{{event.status=='pending'}}">⏳ 待审批</text>
       <text wx:elif="{{event.status=='delete_pending'}}">🗑️ 删除待审批</text>
+      <text wx:elif="{{event.status=='update_pending'}}">✏️ 修改待审批</text>
       <text wx:elif="{{event.status=='approved'}}">✅ 已通过</text>
       <text wx:elif="{{event.status=='rejected'}}">❌ 已拒绝</text>
     </view>
@@ -79,6 +80,18 @@
           <view class="modal-btn cancel" bindtap="closeRejectDeletion">取消</view>
           <view class="modal-btn reject" bindtap="rejectDeletion">确认驳回</view>
         </view>
+      </view>
+    </view>
+
+    <!-- 修改审批操作（创建者对 update_pending 状态） -->
+    <view wx:if="{{isCreator && event.status=='update_pending'}}" class="action-card">
+      <view class="action-title">修改审批</view>
+      <view wx:if="{{event.pending_revision}}" class="section-desc">
+        成员「{{event.pending_revision.editor_name}}」于 {{event.pending_revision.created_at_text}} 提交了修改
+      </view>
+      <view class="action-row">
+        <view class="btn-approve" bindtap="approveEvent">✔ 通过修改</view>
+        <view class="btn-reject" bindtap="showReject">✘ 拒绝修改</view>
       </view>
     </view>
 

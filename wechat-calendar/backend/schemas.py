@@ -101,6 +101,7 @@ class Event(BaseModel):
     event_type: str       # normal / assigned
     assignees: list[dict] = []
     subscribe_to_send_list: list[dict] = []
+    pending_revision: Optional[dict] = None
     created_at: datetime
     updated_at: datetime
 

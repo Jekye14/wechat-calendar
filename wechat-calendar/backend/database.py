@@ -588,6 +588,43 @@ def apply_revision(event_id: int, revision: dict) -> dict:
         return _get_event_with_creator(conn, event_id)
 
 
+def get_event_with_revision(event_id: int) -> Optional[dict]:
+    """获取事件详情，若处于 update_pending 状态则合并 revision 数据并附加元信息"""
+    event = get_event(event_id)
+    if not event:
+        return None
+    if event.get("status") == "update_pending":
+        revision = get_pending_revision(event_id)
+        if revision:
+            # 合并修改提案数据到 event（前端直接显示修改后的结果）
+            for field in ["title", "start_time", "end_time", "location", "content", "remind_before_minutes"]:
+                if field in revision and revision[field] is not None and revision[field] != "":
+                    event[field] = revision[field]
+            # 附加 revision 元信息
+            editor = get_user_by_id(revision["editor_id"])
+            event["pending_revision"] = {
+                "id": revision["id"],
+                "editor_id": revision["editor_id"],
+                "editor_name": editor["nick_name"] if editor else "未知",
+                "status": revision["status"],
+                "created_at": str(revision["created_at"]),
+            }
+    return event
+
+
+def get_calendar_events_with_revisions(cal_id: int) -> list[dict]:
+    """获取日历事件列表，对 update_pending 事件合并 revision 数据"""
+    events = get_calendar_events(cal_id)
+    for event in events:
+        if event.get("status") == "update_pending":
+            revision = get_pending_revision(event["id"])
+            if revision:
+                for field in ["title", "start_time", "end_time", "location", "content", "remind_before_minutes"]:
+                    if field in revision and revision[field] is not None and revision[field] != "":
+                        event[field] = revision[field]
+    return events
+
+
 def delete_event(event_id: int):
     with get_conn() as conn:
         _execute(conn, "DELETE FROM events WHERE id=%s", (event_id,))

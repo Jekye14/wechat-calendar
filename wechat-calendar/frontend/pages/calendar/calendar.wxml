@@ -59,7 +59,7 @@
             <!-- 事件块（绝对定位） -->
             <view
               wx:for="{{eventBlocks}}" wx:key="id"
-              class="event-block {{item.status=='pending'?'ev-pending':''}} {{item.event_type=='assigned'?'ev-assigned':''}}"
+              class="event-block {{item.status=='pending'?'ev-pending':''}} {{item.status=='update_pending'?'ev-pending':''}} {{item.status=='delete_pending'?'ev-pending':''}} {{item.event_type=='assigned'?'ev-assigned':''}}"
               style="{{item.style}}"
               bindtap="openEvent"
               data-id="{{item.id}}"

@@ -51,6 +51,10 @@ Page({
         ...ev,
         created_at_text: formatDateTime(ev.created_at),
       }
+      // 格式化 pending_revision 的时间
+      if (event.pending_revision) {
+        event.pending_revision.created_at_text = formatDateTime(event.pending_revision.created_at)
+      }
       const userId = app.globalData.userInfo && app.globalData.userInfo.id
       this.setData({
         calId: event.calendar_id,
@@ -80,9 +84,12 @@ Page({
   },
 
   approveEvent() {
+    const status = this.data.event && this.data.event.status
+    const isUpdatePending = status === 'update_pending'
+    const isDeletePending = status === 'delete_pending'
     wx.showModal({
       title: '确认审批',
-      content: '确认通过该事件？',
+      content: isUpdatePending ? '确认通过该修改？' : isDeletePending ? '确认同意删除该事件？' : '确认通过该事件？',
       success: (res) => {
         if (res.confirm) {
           app.request({
