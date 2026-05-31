@@ -6,10 +6,13 @@
       <view class="subscribe-title">微信订阅消息</view>
       <view class="subscribe-status {{subscribeStatusClass}}">{{subscribeStatusText}}</view>
     </view>
-    <view class="subscribe-desc">开启后可接收审批结果通知和待审批提醒</view>
+    <view class="subscribe-desc">开启后可接收审批结果通知、待审批提醒和/或日程开始提醒</view>
     <button class="subscribe-btn" bindtap="requestSubscribe" loading="{{subscribeLoading}}">
       {{subscribeButtonText}}
     </button>
+    <view class="sub-tip">
+        请在弹出的授权弹窗点击“总是保持以上选择，不再询问”，避免授权失效
+      </view>
   </view>
   <view wx:if="{{loading}}" class="empty">加载中...</view>
   <view wx:elif="{{notifications.length===0}}" class="empty">

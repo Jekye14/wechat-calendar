@@ -6,6 +6,7 @@ Page({
     notifications: [],
     loading: true,
     subscribeConfig: null,
+    subscribeStatusMap: {},
     subscribeStatusText: '未开启',
     subscribeStatusClass: 'status-off',
     subscribeButtonText: '开启审批通知',
@@ -42,6 +43,8 @@ Page({
       config && config.schedule_update_template_id,
       config && config.event_reminder_template_id,
     ].filter(Boolean)
+    // console.log("updateSubscribeStatus: " + config)
+    // console.log("updateSubscribeStatus: " + tmplIds)
     const states = tmplIds.map(id => statusMap[id] || 'unknown')
 
     let subscribeStatusText = '未开启'
@@ -59,6 +62,7 @@ Page({
 
     this.setData({
       subscribeConfig: config,
+      subscribeStatusMap: statusMap,
       subscribeStatusText,
       subscribeStatusClass,
       subscribeButtonText,
@@ -79,25 +83,63 @@ Page({
   },
 
   requestSubscribe() {
-    // 必须在用户 tap 的同步调用栈内直接调用 requestSubscribeMessage
     const config = this.data.subscribeConfig
     const tmplIds = [
       config && config.approval_result_template_id,
       config && config.schedule_update_template_id,
       config && config.event_reminder_template_id,
     ].filter(Boolean)
-  
+
     if (!tmplIds.length) {
       wx.showToast({ title: '模板未配置', icon: 'none' })
       return
     }
-  
+
+    // 统一逻辑：始终先调用 requestSubscribeMessage
+    // 拿到的结果与后端记录的 subscribeStatusMap 比对，
+    // 完全一致 = 弹窗不会出现 → 引导去设置页管理
+    // 不一致 = 弹窗正常出现 → 上报结果
     this.setData({ subscribeLoading: true })
-  
+    const backendMap = this.data.subscribeStatusMap || {}
+
     wx.requestSubscribeMessage({
       tmplIds,
       success: (res) => {
-        // 这里再异步上报后端没问题
+        // 比对微信返回结果与后端记录是否完全一致
+        const allMatch = tmplIds.every(id => {
+          const wxResult = (res[id] || '').trim()
+          const backendResult = (backendMap[id] || '').trim()
+
+          // 微信返回 reject/ban 都对应后端的 reject
+          if (backendResult === 'reject' && (wxResult === 'reject' || wxResult === 'ban')) return true
+          // 微信返回 accept 对应后端的 accept
+          if (backendResult === 'accept' && wxResult === 'accept') return true
+          // 其余情况视为不一致（包括后端 unknown、两侧不同等）
+          return false
+        })
+
+        if (allMatch) {
+          // 完全一致：弹窗不会出现，引导去设置页
+          this.setData({ subscribeLoading: false })
+          wx.showModal({
+            title: '管理订阅消息',
+            content: '您已授权过订阅消息且设置未变更。要修改设置，请前往小程序设置页面的「订阅消息」进行管理。',
+            confirmText: '前往设置',
+            cancelText: '取消',
+            success: (modalRes) => {
+              if (modalRes.confirm) {
+                wx.openSetting({
+                  success: () => { this.loadSubscribeStatus() }
+                })
+              } else {
+                this.loadSubscribeStatus()
+              }
+            }
+          })
+          return
+        }
+
+        // 不一致：弹窗正常出现，上报结果到后端
         app.request({
           url: '/subscribe/report',
           method: 'POST',
@@ -111,48 +153,29 @@ Page({
       fail: (err) => {
         console.log('requestSubscribeMessage fail:', err)
         this.setData({ subscribeLoading: false })
+
+        // 20004: 微信订阅消息总开关被关闭
+        if (err && err.errCode === 20004) {
+          wx.showModal({
+            title: '订阅消息已关闭',
+            content: '您已关闭微信的订阅消息总开关，无法弹出授权窗口。请前往小程序设置页面打开「订阅消息」开关后再试。',
+            confirmText: '前往设置',
+            cancelText: '取消',
+            success: (modalRes) => {
+              if (modalRes.confirm) {
+                wx.openSetting({
+                  success: () => { this.loadSubscribeStatus() }
+                })
+              }
+            }
+          })
+          return
+        }
+
         wx.showToast({ title: err?.errMsg || '订阅授权未完成', icon: 'none' })
       },
     })
   },
-
-//   requestSubscribe() {
-//     this.setData({ subscribeLoading: true })
-//     app.request({ url: '/subscribe/config' }).then((config) => {
-//       const tmplIds = [
-//         config.approval_result_template_id,
-//         config.schedule_update_template_id,
-//       ].filter(Boolean)
-
-//       if (!tmplIds.length) {
-//         this.setData({ subscribeLoading: false })
-//         wx.showToast({ title: '模板未配置', icon: 'none' })
-//         return
-//       }
-// 
-//       wx.requestSubscribeMessage({
-//         tmplIds,
-//         success: (res) => {
-//           app.request({
-//             url: '/subscribe/report',
-//             method: 'POST',
-//             data: { result: res },
-//           }).finally(() => {
-//             this.setData({ subscribeLoading: false })
-//             this.loadSubscribeStatus()
-//             wx.showToast({ title: '授权结果已更新', icon: 'none' })
-//           })
-//         },
-//         fail: (err) => {
-//           this.setData({ subscribeLoading: false })
-//           console.log('requestSubscribeMessage fail:', err)
-//           wx.showToast({ title: '订阅授权未完成', icon: 'none' })
-//         },
-//       })
-//     }).catch(() => {
-//       this.setData({ subscribeLoading: false })
-//     })
-//   },
 
   goToEvent(e) {
     const { eventId } = e.currentTarget.dataset

@@ -73,25 +73,38 @@ App({
         name: 'sendSubscribe',
         data: payload,
       }).then(res => {
-        // 检查云函数返回状态
         if (!res || !res.result) {
           console.error('[订阅消息] 云函数返回异常:', res)
           return
         }
-        if (!res.result.ok) {
-          console.error('[订阅消息] 云函数执行失败:', res.result.err, payload)
-          return
-        }
-        // 检查微信API返回的错误码
-        if (res.result.result && res.result.result.errcode !== 0) {
-          console.error('[订阅消息] 微信API返回错误:', {
-            errcode: res.result.result.errcode,
-            errmsg: res.result.result.errmsg,
+        // ok 但 sent=false：用户未订阅该模板（正常情况，不需要报警）
+        if (res.result.ok && res.result.sent === false) {
+          console.log('[订阅消息] 用户未订阅此模板, 跳过:', {
             template_id: payload.template_id,
             openid: payload.openid,
           })
+          return
         }
-        return res
+        // ok 且 sent=true：发送成功
+        if (res.result.ok && res.result.sent === true) {
+          console.log('[订阅消息] 发送成功:', {
+            template_id: payload.template_id,
+            openid: payload.openid,
+          })
+          return
+        }
+        // ok 但 sent 未定义（兼容旧版云函数）且 result 有 errcode 检查
+        if (res.result.ok && res.result.result && res.result.result.errCode !== 0) {
+          console.warn('[订阅消息] 微信API返回错误:', {
+            errCode: res.result.result.errCode,
+            errMsg: res.result.result.errMsg,
+            template_id: payload.template_id,
+            openid: payload.openid,
+          })
+          return
+        }
+        // ok=false：云函数执行失败
+        console.error('[订阅消息] 云函数执行失败:', res.result.err, payload)
       }).catch(err => {
         console.error('[订阅消息] 云函数调用失败:', err, payload)
       })
