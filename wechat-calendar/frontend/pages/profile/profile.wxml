@@ -22,7 +22,8 @@
 
     <!-- 使用微信信息提示 -->
     <view class="wechat-hint">
-      <text>{{t.profile.useWechatInfo}}</text>
+      <!-- <text>{{t.profile.useWechatInfo}}</text> -->
+      <text>{{t.profile.restartHint}}</text>
     </view>
   </view>
 

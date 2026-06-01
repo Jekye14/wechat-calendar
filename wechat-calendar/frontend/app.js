@@ -1,4 +1,7 @@
 // app.js
+const zh = require('./locales/zh')
+const en = require('./locales/en')
+
 App({
   globalData: {
     openid: '',
@@ -20,6 +23,9 @@ App({
     const wxLang = (appBaseInfo.language || '').toLowerCase()
     this.globalData.lang = wxLang.startsWith('zh') ? 'zh' : 'en'
 
+    // 动态更新 tabBar 和导航栏标题（随语言切换）
+    this._updateStaticText()
+
     // 新增：初始化云环境（只需要一次）
     wx.cloud.init({
       env: this.globalData.cloudEnv
@@ -37,6 +43,26 @@ App({
       this.globalData.openid = openid
       this.globalData.userInfo = userInfo
     }
+  },
+
+  /**
+   * 动态更新 app.json 中静态文本（tabBar 文字、导航栏标题）。
+   * app.json 不支持运行时表达式，因此通过 API 动态设置。
+   */
+  _updateStaticText() {
+    const locales = { zh, en }
+    const lang = this.globalData.lang
+    const t = locales[lang] || locales.zh
+
+    // 导航栏标题：马上升效，覆盖 app.json 默认值
+    wx.setNavigationBarTitle({ title: t.nav.teamCalendar })
+
+    // tabBar 文字：延迟执行确保 tabBar 已完成初始化
+    setTimeout(() => {
+      wx.setTabBarItem({ index: 0, text: t.nav.calendar })
+      wx.setTabBarItem({ index: 1, text: t.nav.notification })
+      wx.setTabBarItem({ index: 2, text: t.nav.captured })
+    }, 300)
   },
 
   request(options) {
