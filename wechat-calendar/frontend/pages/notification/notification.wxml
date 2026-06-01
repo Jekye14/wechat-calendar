@@ -1,16 +1,26 @@
 <!-- pages/notification/notification.wxml -->
 <view class="page">
-  <view class="nav-title">审批通知</view>
-  <view wx:if="{{loading}}" class="empty">加载中...</view>
+  <view class="nav-title">{{t.nav.notificationTitle}}</view>
+  <view class="subscribe-card">
+    <view class="subscribe-head">
+      <view class="subscribe-title">{{t.notification.wechatSubscribe}}</view>
+      <view class="subscribe-status {{subscribeStatusClass}}">{{subscribeStatusText}}</view>
+    </view>
+    <view class="subscribe-desc">{{t.notification.subscribeDesc}}</view>
+    <button class="subscribe-btn" bindtap="requestSubscribe" loading="{{subscribeLoading}}">
+      {{subscribeButtonText}}
+    </button>
+    <view class="sub-tip">{{t.notification.subscribeTip}}</view>
+  </view>
+  <view wx:if="{{loading}}" class="empty">{{t.common.loading}}</view>
   <view wx:elif="{{notifications.length===0}}" class="empty">
-    <text>暂无通知</text>
+    <text>{{t.notification.noNotifications}}</text>
   </view>
   <view wx:else class="notif-list">
     <view
       class="notif-item {{item.is_read?'read':'unread'}}"
       wx:for="{{notifications}}" wx:key="id"
       bindtap="goToEvent"
-      data-cal-id="{{item.ref_cal_id}}"
       data-event-id="{{item.ref_event_id}}"
     >
       <view class="notif-icon type-{{item.type}}">
@@ -23,7 +33,7 @@
       <view class="notif-body">
         <view class="notif-title">{{item.title}}</view>
         <view class="notif-content">{{item.content}}</view>
-        <view class="notif-time">{{item.created_at}}</view>
+        <view class="notif-time">{{item.created_at_text}}</view>
       </view>
       <view wx:if="{{!item.is_read}}" class="unread-dot"></view>
     </view>

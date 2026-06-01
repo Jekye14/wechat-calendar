@@ -18,11 +18,14 @@
             "ignore": [],
             "disablePlugins": [],
             "outputPath": ""
-        }
+        },
+        "cloudfunctionRoot": "cloudfunctions/"
     },
     "condition": {},
     "editorSetting": {
         "tabIndent": "insertSpaces",
         "tabSize": 4
-    }
+    },
+    "cloudfunctionTemplateRoot": "cloudfunctionTemplate/",
+    "cloudfunctionRoot": "cloudfunctions/"
 }

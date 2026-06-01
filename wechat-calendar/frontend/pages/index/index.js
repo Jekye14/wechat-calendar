@@ -1,8 +1,10 @@
 // pages/index/index.js  ── 首页：日历列表 + 登录
 const app = getApp()
+const i18n = require('../../utils/i18n')
 
 Page({
   data: {
+    t: {},
     calendars: [],
     userInfo: null,
     loading: true,
@@ -12,6 +14,9 @@ Page({
   },
 
   onLoad() {
+    const t = i18n.getLocale()
+    this.setData({ t })
+    wx.setNavigationBarTitle({ title: t.nav.home })
     if (!app.globalData.openid) {
       this.doLogin()
     } else {
@@ -23,6 +28,9 @@ Page({
   onShow() {
     if (app.globalData.openid) this.loadCalendars()
   },
+  goProfile() {
+    wx.navigateTo({ url: '/pages/profile/profile' })
+  },
   doLogin() {
     // 直接发起请求，网关会自动鉴权并把 X-WX-OPENID 传给后端
     app.request({
@@ -30,7 +38,7 @@ Page({
       method: 'POST',
       data: {
         // code 已经不需要传了
-        nick_name: '微信用户',
+        nick_name: this.data.t.index.wechatUser,
         avatar_url: '',
       }
     }).then(data => {
@@ -42,7 +50,7 @@ Page({
       this.loadCalendars()
     }).catch((e) => {
       console.log('login failed:', e)
-      wx.showToast({ title: '登录失败', icon: 'none' })
+      wx.showToast({ title: this.data.t.index.loginFailed, icon: 'none' })
     })
   },
 //   doLogin() {
@@ -70,7 +78,7 @@ Page({
 //           this.loadCalendars()
 //         }).catch((e) => {
 //           console.log('login failed:', e)
-//           wx.showToast({ title: '登录失败', icon: 'none' })
+//           wx.showToast({ title: this.data.t.index.loginFailed, icon: 'none' })
 //         })
 //       },
 //       fail: (err) => {
@@ -129,7 +137,7 @@ Page({
   createCalendar() {
     const { newName, newDesc } = this.data
     if (!newName.trim()) {
-      wx.showToast({ title: '请输入日历名称', icon: 'none' })
+      wx.showToast({ title: this.data.t.index.pleaseEnterName, icon: 'none' })
       return
     }
     app.request({
@@ -152,7 +160,7 @@ Page({
       const code = res && res.bind_code
       const expiresAt = res && (res.expires_at || res.expiresAt)
       if (!code) {
-        wx.showToast({ title: '未获取到 bind_code', icon: 'none' })
+        wx.showToast({ title: this.data.t.index.noBindCode, icon: 'none' })
         return
       }
 
@@ -161,7 +169,7 @@ Page({
         data: code,
         success: () => {
           wx.showModal({
-            title: '绑定码已生成（有效期10分钟）',
+            title: this.data.t.index.bindCodeGeneratedDetail,
             content: `bind_code: ${code}\nexpires_at: ${expiresAt || ''}`,
             showCancel: false
           })
@@ -169,15 +177,15 @@ Page({
         },
         fail: () => {
           wx.showModal({
-            title: '绑定码已生成',
-            content: `bind_code: ${code}\nexpires_at: ${expiresAt || ''}\n（复制失败，请手动复制）`,
+            title: this.data.t.index.bindCodeGenerated,
+            content: `bind_code: ${code}\nexpires_at: ${expiresAt || ''}\n` + this.data.t.index.bindCodeCopyFailed,
             showCancel: false
           })
         }
       })
     }).catch(e => {
       console.log('bind-code failed:', e)
-      wx.showToast({ title: '生成绑定码失败', icon: 'none' })
+      wx.showToast({ title: this.data.t.index.bindCodeGenerateFailed, icon: 'none' })
     })
   },
 })

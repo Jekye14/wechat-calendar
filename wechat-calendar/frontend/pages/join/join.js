@@ -1,5 +1,6 @@
 // pages/join/join.js  ── 通过邀请链接加入日历
 const app = getApp()
+const i18n = require('../../utils/i18n')
 
 Page({
   data: {
@@ -7,14 +8,16 @@ Page({
     status: 'loading',  // loading | success | error
     message: '',
     calendarName: '',
+    t: {},
   },
   onLoad(options) {
+    const t = i18n.getLocale()
     const token = options.token || ''
     if (!token) {
-      this.setData({ status: 'error', message: '邀请链接无效' })
+      this.setData({ status: 'error', message: t.join.inviteInvalid, t })
       return
     }
-    this.setData({ token })
+    this.setData({ token, t })
     
     if (!app.globalData.openid) {
       // 删去 wx.login 嵌套，直接请求
@@ -29,7 +32,7 @@ Page({
         wx.setStorageSync('userInfo', data.user)
         this.doJoin(token)
       }).catch(() => {
-        this.setData({ status: 'error', message: '自动登录失败' })
+        this.setData({ status: 'error', message: this.data.t.join.autoLoginFailed })
       })
     } else {
       this.doJoin(token)
@@ -78,7 +81,7 @@ Page({
         calId: data.calendar && data.calendar.id,
       })
     }).catch(() => {
-      this.setData({ status: 'error', message: '加入失败，邀请链接可能已过期' })
+      this.setData({ status: 'error', message: this.data.t.join.joinFailed })
     })
   },
 

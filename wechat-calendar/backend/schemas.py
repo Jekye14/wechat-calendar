@@ -67,6 +67,7 @@ class CreateEventRequest(BaseModel):
     end_time: Optional[str] = None
     location: Optional[str] = ""
     content: Optional[str] = ""
+    remind_before_minutes: Optional[int] = 10
 
 class CreateAssignedEventRequest(BaseModel):
     title: str
@@ -82,6 +83,7 @@ class UpdateEventRequest(BaseModel):
     end_time: Optional[str] = None
     location: Optional[str] = None
     content: Optional[str] = None
+    remind_before_minutes: Optional[int] = None
 
 class Event(BaseModel):
     id: int
@@ -93,14 +95,34 @@ class Event(BaseModel):
     end_time: str
     location: str
     content: str
+    remind_before_minutes: Optional[int] = None
+    reminder_sent_at: Optional[datetime] = None
     status: str           # pending / approved / rejected / delete_pending
     event_type: str       # normal / assigned
     assignees: list[dict] = []
+    subscribe_to_send_list: list[dict] = []
+    pending_revision: Optional[dict] = None
     created_at: datetime
     updated_at: datetime
 
 class RejectRequest(BaseModel):
     reason: Optional[str] = ""
+
+# ── 事件修改提案 ────────────────────────────────────────────
+
+class EventRevision(BaseModel):
+    id: int
+    event_id: int
+    editor_id: int
+    title: str
+    start_time: str
+    end_time: str
+    location: str
+    content: str
+    remind_before_minutes: Optional[int] = None
+    status: str
+    created_at: datetime
+    updated_at: datetime
 
 # ── 通知 ────────────────────────────────────────────────────
 
@@ -114,6 +136,20 @@ class Notification(BaseModel):
     ref_event_id: Optional[int]
     ref_cal_id: Optional[int]
     created_at: datetime
+
+
+class SubscribeConfigResponse(BaseModel):
+    approval_result_template_id: str = ""
+    schedule_update_template_id: str = ""
+    event_reminder_template_id: str = ""
+
+
+class SubscribeReportRequest(BaseModel):
+    result: dict[str, str]
+
+
+class SubscribeStatusResponse(BaseModel):
+    status: dict[str, str]
 
 
 # ── App 绑定 / 捕获通知 / 批量创建 ──────────────────────────
@@ -162,6 +198,7 @@ class BatchCreateEventsRequest(BaseModel):
     end_time: Optional[str] = None
     location: Optional[str] = ""
     content: Optional[str] = ""
+    remind_before_minutes: Optional[int] = 10
 
 
 class BatchCreateEventResult(BaseModel):
@@ -175,8 +212,10 @@ class BatchCreateEventResult(BaseModel):
 class BatchCreateEventsResponse(BaseModel):
     all_ok: bool
     results: list[BatchCreateEventResult]
+    subscribe_to_send_list: list[dict] = []
 
 
 class CreateEventsFromCapturedResponse(BaseModel):
     all_ok: bool
     results: list[BatchCreateEventResult]
+    subscribe_to_send_list: list[dict] = []

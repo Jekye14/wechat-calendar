@@ -10,6 +10,7 @@
 - 本文件保持原有函数签名，供 main.py 直接调用
 - 启动时 init_db() 自动建表（幂等）
 """
+import json
 import os
 from typing import Optional, Any
 from datetime import datetime
@@ -163,6 +164,18 @@ def init_db():
             """)
 
             cur.execute("""
+            CREATE TABLE IF NOT EXISTS wx_subscribe_prefs (
+                user_id BIGINT NOT NULL,
+                template_id VARCHAR(128) NOT NULL,
+                state VARCHAR(16) NOT NULL,
+                raw_json JSON NULL,
+                updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, template_id),
+                CONSTRAINT fk_subscribe_prefs_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """)
+
+            cur.execute("""
             CREATE TABLE IF NOT EXISTS bind_codes (
                 code VARCHAR(64) PRIMARY KEY,
                 user_id BIGINT NOT NULL,
@@ -204,7 +217,58 @@ def init_db():
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             """)
 
+            cur.execute("""
+            CREATE TABLE IF NOT EXISTS event_revisions (
+                id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                event_id BIGINT NOT NULL,
+                editor_id BIGINT NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                start_time VARCHAR(64) NOT NULL,
+                end_time VARCHAR(64) NOT NULL,
+                location VARCHAR(255) NOT NULL DEFAULT '',
+                content TEXT,
+                remind_before_minutes INT,
+                status VARCHAR(32) NOT NULL DEFAULT 'pending',
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                CONSTRAINT fk_rev_event FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
+                CONSTRAINT fk_rev_editor FOREIGN KEY (editor_id) REFERENCES users(id) ON DELETE CASCADE,
+                INDEX idx_revisions_event_status (event_id, status)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+            """)
+
         conn.commit()
+        _ensure_events_reminder_columns(conn)
+
+
+def _column_exists(conn, table_name: str, column_name: str) -> bool:
+    row = _fetchone(conn, """
+        SELECT 1 AS ok
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA=%s AND TABLE_NAME=%s AND COLUMN_NAME=%s
+        LIMIT 1
+    """, (MYSQL_DATABASE, table_name, column_name))
+    return row is not None
+
+
+def _ensure_events_reminder_columns(conn):
+    try:
+        if not _column_exists(conn, "events", "remind_before_minutes"):
+            with conn.cursor() as cur:
+                cur.execute(
+                    "ALTER TABLE events ADD COLUMN remind_before_minutes INT NULL DEFAULT 10 AFTER content"
+                )
+    except Exception:
+        pass
+    try:
+        if not _column_exists(conn, "events", "reminder_sent_at"):
+            with conn.cursor() as cur:
+                cur.execute(
+                    "ALTER TABLE events ADD COLUMN reminder_sent_at DATETIME NULL AFTER remind_before_minutes"
+                )
+    except Exception:
+        pass
+    conn.commit()
 
 
 # ── 用户 ────────────────────────────────────────────────────
@@ -347,15 +411,15 @@ def remove_member(cal_id: int, user_id: int):
 # ── 事件 ────────────────────────────────────────────────────
 
 def create_event(cal_id, creator_id, title, start_time, end_time,
-                 location, content, status, event_type) -> dict:
+                 location, content, status, event_type, remind_before_minutes=10) -> dict:
     with get_conn() as conn:
         new_id = _execute(conn, """
             INSERT INTO events
                 (calendar_id, creator_id, title, start_time, end_time,
-                 location, content, status, event_type)
-            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                 location, content, remind_before_minutes, status, event_type)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
         """, (cal_id, creator_id, title, start_time, end_time,
-              location or "", content or "", status, event_type))
+              location or "", content or "", remind_before_minutes, status, event_type))
         conn.commit()
         return _get_event_with_creator(conn, new_id)
 
@@ -400,6 +464,7 @@ def update_event(event_id: int, body, new_status: str) -> dict:
         if not event:
             return None
         e = dict(event)
+        incoming = body.model_dump(exclude_unset=True) if hasattr(body, "model_dump") else {}
 
         _execute(conn, """
             UPDATE events SET
@@ -408,15 +473,17 @@ def update_event(event_id: int, body, new_status: str) -> dict:
                 end_time=%s,
                 location=%s,
                 content=%s,
+                remind_before_minutes=%s,
                 status=%s,
                 updated_at=CURRENT_TIMESTAMP
             WHERE id=%s
         """, (
-            getattr(body, "title", None) or e["title"],
-            getattr(body, "start_time", None) or e["start_time"],
-            getattr(body, "end_time", None) or e["end_time"],
-            (body.location if getattr(body, "location", None) is not None else e["location"]),
-            (body.content if getattr(body, "content", None) is not None else e["content"]),
+            incoming["title"] if ("title" in incoming and incoming["title"] is not None) else e["title"],
+            incoming["start_time"] if ("start_time" in incoming and incoming["start_time"] is not None) else e["start_time"],
+            incoming["end_time"] if ("end_time" in incoming and incoming["end_time"] is not None) else e["end_time"],
+            incoming["location"] if ("location" in incoming and incoming["location"] is not None) else e["location"],
+            incoming["content"] if ("content" in incoming and incoming["content"] is not None) else e["content"],
+            incoming["remind_before_minutes"] if "remind_before_minutes" in incoming else e.get("remind_before_minutes"),
             new_status,
             event_id,
         ))
@@ -432,6 +499,130 @@ def update_event_status(event_id: int, status: str):
             (status, event_id),
         )
         conn.commit()
+
+
+# ── 事件修改提案（event_revisions）────────────────────────────
+
+def create_event_revision(event_id: int, editor_id: int, body) -> dict:
+    """成员修改事件时，将修改内容写入 event_revisions 表，不碰 events 表"""
+    incoming = body.model_dump(exclude_unset=True) if hasattr(body, "model_dump") else body
+    with get_conn() as conn:
+        # 同一事件已有 pending 提案时覆盖（只保留最新一个）
+        existing = _fetchone(
+            conn,
+            "SELECT id FROM event_revisions WHERE event_id=%s AND status='pending' LIMIT 1",
+            (event_id,),
+        )
+        if existing:
+            _execute(conn, "DELETE FROM event_revisions WHERE id=%s", (existing["id"],))
+
+        new_id = _execute(conn, """
+            INSERT INTO event_revisions
+                (event_id, editor_id, title, start_time, end_time, location, content, remind_before_minutes)
+            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+        """, (
+            event_id, editor_id,
+            incoming.get("title", ""),
+            incoming.get("start_time", ""),
+            incoming.get("end_time", ""),
+            incoming.get("location", ""),
+            incoming.get("content", ""),
+            incoming.get("remind_before_minutes"),
+        ))
+        conn.commit()
+        row = _fetchone(conn, "SELECT * FROM event_revisions WHERE id=%s", (new_id,))
+        return row_to_dict(row)
+
+
+def get_pending_revision(event_id: int) -> Optional[dict]:
+    """获取事件最新的待审批修改提案"""
+    with get_conn() as conn:
+        row = _fetchone(
+            conn,
+            "SELECT * FROM event_revisions WHERE event_id=%s AND status='pending' ORDER BY created_at DESC LIMIT 1",
+            (event_id,),
+        )
+        return row_to_dict(row)
+
+
+def update_revision_status(revision_id: int, status: str):
+    """更新提案状态（approved / rejected）"""
+    with get_conn() as conn:
+        _execute(
+            conn,
+            "UPDATE event_revisions SET status=%s, updated_at=CURRENT_TIMESTAMP WHERE id=%s",
+            (status, revision_id),
+        )
+        conn.commit()
+
+
+def apply_revision(event_id: int, revision: dict) -> dict:
+    """将修改提案的数据写入 events 表，同时标记提案为 approved"""
+    with get_conn() as conn:
+        _execute(conn, """
+            UPDATE events SET
+                title=%s,
+                start_time=%s,
+                end_time=%s,
+                location=%s,
+                content=%s,
+                remind_before_minutes=%s,
+                status='approved',
+                updated_at=CURRENT_TIMESTAMP
+            WHERE id=%s
+        """, (
+            revision["title"],
+            revision["start_time"],
+            revision["end_time"],
+            revision["location"] or "",
+            revision["content"] or "",
+            revision.get("remind_before_minutes"),
+            event_id,
+        ))
+        _execute(
+            conn,
+            "UPDATE event_revisions SET status='approved', updated_at=CURRENT_TIMESTAMP WHERE id=%s",
+            (revision["id"],),
+        )
+        conn.commit()
+        return _get_event_with_creator(conn, event_id)
+
+
+def get_event_with_revision(event_id: int) -> Optional[dict]:
+    """获取事件详情，若处于 update_pending 状态则合并 revision 数据并附加元信息"""
+    event = get_event(event_id)
+    if not event:
+        return None
+    if event.get("status") == "update_pending":
+        revision = get_pending_revision(event_id)
+        if revision:
+            # 合并修改提案数据到 event（前端直接显示修改后的结果）
+            for field in ["title", "start_time", "end_time", "location", "content", "remind_before_minutes"]:
+                if field in revision and revision[field] is not None and revision[field] != "":
+                    event[field] = revision[field]
+            # 附加 revision 元信息
+            editor = get_user_by_id(revision["editor_id"])
+            event["pending_revision"] = {
+                "id": revision["id"],
+                "editor_id": revision["editor_id"],
+                "editor_name": editor["nick_name"] if editor else "未知",
+                "status": revision["status"],
+                "created_at": str(revision["created_at"]),
+            }
+    return event
+
+
+def get_calendar_events_with_revisions(cal_id: int) -> list[dict]:
+    """获取日历事件列表，对 update_pending 事件合并 revision 数据"""
+    events = get_calendar_events(cal_id)
+    for event in events:
+        if event.get("status") == "update_pending":
+            revision = get_pending_revision(event["id"])
+            if revision:
+                for field in ["title", "start_time", "end_time", "location", "content", "remind_before_minutes"]:
+                    if field in revision and revision[field] is not None and revision[field] != "":
+                        event[field] = revision[field]
+    return events
 
 
 def delete_event(event_id: int):
@@ -514,6 +705,31 @@ def get_unread_count(user_id: int) -> int:
             WHERE user_id=%s AND is_read=0
         """, (user_id,))
         return int(row["cnt"]) if row else 0
+
+
+def upsert_subscribe_pref(user_id: int, template_id: str, state: str, raw_json):
+    raw_payload = json.dumps(raw_json, ensure_ascii=False) if raw_json is not None else None
+    with get_conn() as conn:
+        _execute(conn, """
+            INSERT INTO wx_subscribe_prefs
+                (user_id, template_id, state, raw_json)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE
+                state=VALUES(state),
+                raw_json=VALUES(raw_json),
+                updated_at=CURRENT_TIMESTAMP
+        """, (user_id, template_id, state, raw_payload))
+        conn.commit()
+
+
+def get_subscribe_prefs(user_id: int) -> dict[str, str]:
+    with get_conn() as conn:
+        rows = _fetchall(conn, """
+            SELECT template_id, state
+            FROM wx_subscribe_prefs
+            WHERE user_id=%s
+        """, (user_id,))
+        return {row["template_id"]: row["state"] for row in rows or []}
 
 
 # ── App 绑定/令牌 ─────────────────────────────────────────────

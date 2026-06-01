@@ -1,12 +1,17 @@
 const app = getApp()
+const i18n = require('../../utils/i18n')
 
 Page({
   data: {
     loading: true,
     list: [],
+    t: {},
   },
 
-  onLoad() { this.load() },
+  onLoad() {
+    this.setData({ t: i18n.getLocale() })
+    this.load()
+  },
   onShow() { this.load() },
 
   load() {
@@ -18,16 +23,17 @@ Page({
 
   dismissItem(e) {
     const id = e.currentTarget.dataset.id
+    const t = this.data.t
     wx.showModal({
-      title: '忽略该捕获？',
-      content: '忽略后将不会出现在捕获列表',
+      title: t.captured.ignoreTitle,
+      content: t.captured.ignoreDesc,
       success: (res) => {
         if (!res.confirm) return
         app.request({
           url: `/captured-notifications/${id}/dismiss`,
           method: 'POST'
         }).then(() => {
-          wx.showToast({ title: '已忽略' })
+          wx.showToast({ title: t.captured.ignored })
           this.load()
         })
       }
