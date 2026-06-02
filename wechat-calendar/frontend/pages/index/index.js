@@ -20,13 +20,32 @@ Page({
     if (!app.globalData.openid) {
       this.doLogin()
     } else {
-      this.setData({ userInfo: app.globalData.userInfo })
+      this.syncProfile()
       this.loadCalendars()
     }
   },
 
   onShow() {
-    if (app.globalData.openid) this.loadCalendars()
+    if (app.globalData.openid) {
+      this.syncProfile()
+      this.loadCalendars()
+    }
+  },
+  /**
+   * 从后端拉取最新用户资料，解决多端同步问题。
+   * 本地 Storage 仅作快速首屏 fallback，真实数据以后端为准。
+   */
+  syncProfile() {
+    app.request({ url: '/auth/profile' }).then(data => {
+      if (data.ok && data.user) {
+        app.globalData.userInfo = data.user
+        wx.setStorageSync('userInfo', data.user)
+        this.setData({ userInfo: data.user })
+      }
+    }).catch(() => {
+      // 网络失败时用本地缓存兜底
+      this.setData({ userInfo: app.globalData.userInfo })
+    })
   },
   goProfile() {
     wx.navigateTo({ url: '/pages/profile/profile' })

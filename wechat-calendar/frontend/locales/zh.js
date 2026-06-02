@@ -236,7 +236,7 @@ module.exports = {
     avatar: '头像',
     nickname: '昵称',
     useWechatInfo: '使用微信头像/昵称',
-    restartHint: '修改后请重启小程序以加载头像和昵称',
+    restartHint: '',
     tapToChangeAvatar: '点击更换头像',
     nicknamePlaceholder: '请输入昵称',
     saveProfile: '保存修改',

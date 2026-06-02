@@ -236,7 +236,7 @@ module.exports = {
     avatar: 'Avatar',
     nickname: 'Nickname',
     useWechatInfo: 'Use WeChat Avatar/Nickname',
-    restartHint: 'Please restart to load avatar and nickname',
+    restartHint: '',
     tapToChangeAvatar: 'Tap to change avatar',
     nicknamePlaceholder: 'Enter nickname',
     saveProfile: 'Save Profile',

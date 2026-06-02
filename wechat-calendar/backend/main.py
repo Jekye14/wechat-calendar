@@ -251,6 +251,12 @@ def login(body: schemas.LoginRequest, x_wx_openid: str = Header(default=None)):
     user = db.get_or_create_user(openid, body.nick_name, body.avatar_url)
     return {"openid": openid, "user": user}
 
+@app.get("/auth/profile")
+def get_profile(user=Depends(get_current_user)):
+    """返回当前用户的最新资料，用于多端同步"""
+    current = db.get_user_by_id(user["id"])
+    return {"ok": True, "user": current}
+
 @app.put("/auth/profile")
 def update_profile(body: schemas.UpdateProfileRequest, user=Depends(get_current_user)):
     db.update_user(user["id"], body.nick_name, body.avatar_url)
@@ -390,7 +396,7 @@ def get_event(cal_id: int, event_id: int, user=Depends(get_current_user)):
 
 @app.get("/events/{event_id}", response_model=schemas.Event)
 def get_event_by_id(event_id: int, user=Depends(get_current_user)):
-    event = db.get_event(event_id)
+    event = db.get_event_with_revision(event_id)
     if not event:
         raise HTTPException(status_code=404, detail="事件不存在")
 

@@ -23,13 +23,13 @@ Page({
     const t = i18n.getLocale()
     const calId = parseInt(options.calId)
     const date = options.date || this.todayStr()
-    this.setData({ calId, startDate: date, endDate: date, t, assignMembersText: this.formatAssignMembersText(0) })
+    this.setData({ calId, startDate: date, endDate: date, t, assignMembersText: this.formatAssignMembersText(0, t) })
     wx.setNavigationBarTitle({ title: t.nav.createAssignedEvent })
     this.loadMembers()
   },
 
-  formatAssignMembersText(count) {
-    const t = this.data.t
+  formatAssignMembersText(count, t) {
+    t = t || this.data.t
     const template = t.event.assignMembers || '选择指派成员 *（已选 {{count}} 人）'
     return template.replace('{{count}}', count)
   },
